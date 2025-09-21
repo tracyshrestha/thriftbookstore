@@ -1,0 +1,22 @@
+[
+  {
+    "id": "checkout_001",
+    "userId": "user_001",
+    "bookId": "book_002",
+    "checkoutDate": "2024-01-15",
+    "dueDate": "2024-02-15",
+    "isOverdue": true,
+    "renewalCount": 1,
+    "maxRenewals": 2
+  },
+  {
+    "id": "checkout_002",
+    "userId": "user_001",
+    "bookId": "book_006",
+    "checkoutDate": "2024-01-20",
+    "dueDate": "2024-02-20",
+    "isOverdue": false,
+    "renewalCount": 0,
+    "maxRenewals": 2
+  }
+]
