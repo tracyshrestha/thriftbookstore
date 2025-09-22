@@ -5,7 +5,7 @@ const Dashboard: React.FC = () => {
     <div style={{ padding: "2rem" }}>
       <h2>Dashboard</h2>
       <div style={{ marginTop: "2rem" }}>
-        <p>Welcome to your dashboard!</p>
+        <p>Welcome to your User dashboard!</p>
         <div
           style={{
             display: "grid",
