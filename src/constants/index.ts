@@ -36,7 +36,7 @@ export const DEMO_CREDENTIALS = {
     { email: "john@example.com", name: "John Smith" },
   ],
   ADMIN_USER: {
-    email: "admin@library.com",
+    email: "admin@admin.com",
     name: "Admin User",
   },
 } as const;
