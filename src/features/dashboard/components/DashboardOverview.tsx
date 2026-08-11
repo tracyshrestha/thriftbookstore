@@ -10,7 +10,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 import {
   getDashboardOverview,
   type ActivityBar,
@@ -318,85 +318,71 @@ export default function DashboardOverview() {
 
     try {
       // Let paint clear hover tooltips before capture
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r(null))),
+      );
 
-      const canvas = await html2canvas(node, {
-        scale: Math.min(2, window.devicePixelRatio || 2),
-        useCORS: true,
-        allowTaint: true,
+      const width = node.scrollWidth;
+      const height = node.scrollHeight;
+      const pixelRatio = Math.min(2, window.devicePixelRatio || 2);
+
+      const captureOptions = {
+        cacheBust: true,
+        pixelRatio,
         backgroundColor: "#f8fafc",
-        logging: false,
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        windowWidth: document.documentElement.clientWidth,
-        ignoreElements: (el) =>
-          el instanceof HTMLElement && el.hasAttribute("data-export-ignore"),
-      });
+        width,
+        height,
+        style: {
+          // Stabilize layout during serialization
+          transform: "none",
+          width: `${width}px`,
+          height: `${height}px`,
+        },
+        filter: (el: HTMLElement) => {
+          if (el.hasAttribute?.("data-export-ignore")) return false;
+          return true;
+        },
+        skipFonts: true,
+      };
 
-      const dataUrl = canvas.toDataURL("image/png");
+      // html-to-image handles modern CSS (oklch) better than html2canvas
+      let dataUrl = "";
+      try {
+        dataUrl = await toPng(node, captureOptions);
+      } catch (firstErr) {
+        console.warn("Export attempt 1 failed, retrying…", firstErr);
+        // Retry without size override (some browsers choke on explicit dims)
+        dataUrl = await toPng(node, {
+          cacheBust: true,
+          pixelRatio: 1,
+          backgroundColor: "#ffffff",
+          skipFonts: true,
+          filter: captureOptions.filter,
+        });
+      }
+
+      if (!dataUrl || dataUrl.length < 32) {
+        throw new Error("Empty export image");
+      }
+
       const stamp = new Date().toISOString().slice(0, 10);
       const filename = `thrift-dashboard-${stamp}.png`;
 
-      // Download PNG
+      // Download PNG only
       const a = document.createElement("a");
       a.download = filename;
       a.href = dataUrl;
+      a.rel = "noopener";
+      document.body.appendChild(a);
       a.click();
-
-      // Open print dialog with the image
-      const printWin = window.open("", "_blank");
-      if (printWin) {
-        printWin.document.open();
-        printWin.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Thrift Dashboard — ${stamp}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 16px;
-      background: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      font-family: system-ui, sans-serif;
-    }
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-    }
-    @media print {
-      body { padding: 0; }
-      img { max-width: 100%; page-break-inside: avoid; }
-    }
-  </style>
-</head>
-<body>
-  <img src="${dataUrl}" alt="Dashboard export" />
-  <script>
-    const img = document.querySelector("img");
-    function go() {
-      setTimeout(function () {
-        window.focus();
-        window.print();
-      }, 150);
-    }
-    if (img.complete) go();
-    else img.onload = go;
-  </script>
-</body>
-</html>`);
-        printWin.document.close();
-      }
+      a.remove();
 
       toast({
-        message: "Dashboard image exported — ready to print.",
+        message: "Dashboard image saved.",
         variant: "success",
       });
-    } catch {
+    } catch (err) {
+      console.error("Dashboard export failed:", err);
       toast({
         message: "Could not export the dashboard image. Try again.",
         variant: "default",

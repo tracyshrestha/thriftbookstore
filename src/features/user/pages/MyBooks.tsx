@@ -46,7 +46,6 @@ const MyBooks: React.FC = () => {
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [animateIn, setAnimateIn] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [activeTab, setActiveTab] = useState<BooksTab>("listed");
 
@@ -99,8 +98,6 @@ const MyBooks: React.FC = () => {
         setMyListings(listings);
         setBoughtBooks(bought);
         setSavedBooks(saved);
-        setAnimateIn(false);
-        requestAnimationFrame(() => setAnimateIn(true));
       } catch {
         if (!cancelled) setError("Failed to load your books.");
       } finally {
@@ -201,7 +198,6 @@ const MyBooks: React.FC = () => {
             value={String(activeCount)}
             badge={`${Math.round((activeCount / listedTotal) * 100)}%`}
             badgeUp
-            barWidth={animateIn ? (activeCount / listedTotal) * 100 : 0}
             icon={<BookMarked className="h-4 w-4" />}
           />
           <MetricCard
@@ -209,7 +205,6 @@ const MyBooks: React.FC = () => {
             value={String(boughtBooks.length)}
             badge={boughtBooks.length > 0 ? "Owned" : "—"}
             badgeUp={boughtBooks.length > 0}
-            barWidth={animateIn ? Math.min(100, boughtBooks.length * 35) : 0}
             icon={<ShoppingBag className="h-4 w-4" />}
           />
           <MetricCard
@@ -217,7 +212,6 @@ const MyBooks: React.FC = () => {
             value={String(savedBooks.length)}
             badge={savedBooks.length > 0 ? "Wishlist" : "—"}
             badgeUp={savedBooks.length > 0}
-            barWidth={animateIn ? Math.min(100, savedBooks.length * 35) : 0}
             icon={<Heart className="h-4 w-4" />}
           />
         </div>
@@ -405,17 +399,18 @@ function ConditionStars({ condition }: { condition?: Book["condition"] }) {
     Acceptable: 1,
     Fair: 2,
     Good: 3,
-    "Like New": 4,
+    "Very Good": 4,
+    "Like New": 5,
   };
   const n = map[condition] ?? 0;
   if (!n) return null;
   return (
     <div
       className="inline-flex items-center gap-0.5"
-      title={condition}
-      aria-label={`Condition ${condition}`}
+      title={`${condition} · ${n}/5`}
+      aria-label={`Condition ${condition}, ${n} out of 5 stars`}
     >
-      {Array.from({ length: 4 }, (_, i) => (
+      {Array.from({ length: 5 }, (_, i) => (
         <Star
           key={i}
           className={`h-3 w-3 ${
@@ -646,14 +641,12 @@ function MetricCard({
   value,
   badge,
   badgeUp,
-  barWidth,
   icon,
 }: {
   title: string;
   value: string;
   badge: string;
   badgeUp: boolean;
-  barWidth: number;
   icon: React.ReactNode;
 }) {
   return (
@@ -675,12 +668,6 @@ function MetricCard({
         >
           {badge}
         </span>
-      </div>
-      <div className="mt-3 h-1.5 rounded-full bg-ink-50 overflow-hidden">
-        <div
-          className="h-full rounded-full bg-ink-500 transition-all duration-700"
-          style={{ width: `${Math.min(100, Math.max(barWidth, 0))}%` }}
-        />
       </div>
     </div>
   );

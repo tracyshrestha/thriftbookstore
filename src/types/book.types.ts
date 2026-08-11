@@ -17,7 +17,7 @@ export interface Book {
   price: number;
   /** Set when a user listed this book for sale */
   sellerId?: string;
-  condition?: "Like New" | "Good" | "Fair" | "Acceptable";
+  condition?: "Like New" | "Very Good" | "Good" | "Fair" | "Acceptable";
   listedAt?: string;
   status?: "active" | "sold" | "draft";
 }

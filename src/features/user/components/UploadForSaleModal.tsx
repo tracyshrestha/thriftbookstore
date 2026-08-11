@@ -26,15 +26,16 @@ export type UploadListingFormValues = {
   coverPreview: string;
 };
 
-/** Star levels 1–4 map to thrift condition (worst → best) */
+/** Star levels 1–5 map to thrift condition (worst → best) */
 const CONDITION_BY_STARS: NonNullable<Book["condition"]>[] = [
   "Acceptable",
   "Fair",
   "Good",
+  "Very Good",
   "Like New",
 ];
 
-const STARS = [1, 2, 3, 4] as const;
+const STARS = [1, 2, 3, 4, 5] as const;
 
 function starsForCondition(condition: NonNullable<Book["condition"]>): number {
   const i = CONDITION_BY_STARS.indexOf(condition);
@@ -42,7 +43,7 @@ function starsForCondition(condition: NonNullable<Book["condition"]>): number {
 }
 
 function conditionForStars(stars: number): NonNullable<Book["condition"]> {
-  const idx = Math.min(3, Math.max(0, Math.round(stars) - 1));
+  const idx = Math.min(4, Math.max(0, Math.round(stars) - 1));
   return CONDITION_BY_STARS[idx];
 }
 
@@ -68,6 +69,11 @@ type UploadForSaleModalProps = {
   isSubmitting?: boolean;
   onClose: () => void;
   onSubmit: (values: UploadListingFormValues) => void | Promise<void>;
+  /** Modal heading (defaults to user upload copy) */
+  heading?: string;
+  description?: string;
+  submitLabel?: string;
+  submittingLabel?: string;
 };
 
 export function UploadForSaleModal({
@@ -75,6 +81,10 @@ export function UploadForSaleModal({
   isSubmitting = false,
   onClose,
   onSubmit,
+  heading = "Upload for sale",
+  description = "List a thrift book on the marketplace",
+  submitLabel = "List for sale",
+  submittingLabel = "Listing...",
 }: UploadForSaleModalProps) {
   const titleId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -269,10 +279,10 @@ export function UploadForSaleModal({
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-ink-100 bg-white px-5 py-4">
           <div>
             <h2 id={titleId} className="text-lg font-semibold text-ink-950">
-              Upload for sale
+              {heading}
             </h2>
             <p className="text-sm text-ink-500 mt-0.5">
-              List a thrift book on the marketplace
+              {description}
             </p>
           </div>
           <button
@@ -378,7 +388,8 @@ export function UploadForSaleModal({
               })}
             </div>
             <p className="text-xs text-ink-400">
-              Click stars to rate condition: Acceptable → Fair → Good → Like New
+              Click stars (out of 5): Acceptable · Fair · Good · Very Good · Like
+              New
             </p>
           </div>
 
@@ -497,7 +508,7 @@ export function UploadForSaleModal({
               disabled={isSubmitting}
               className="bg-ink-700 hover:bg-ink-800 text-white"
             >
-              {isSubmitting ? "Listing..." : "List for sale"}
+              {isSubmitting ? submittingLabel : submitLabel}
             </Button>
           </div>
         </form>

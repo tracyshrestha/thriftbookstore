@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   deleteBook,
   getAvailableBooks,
+  createListing,
   updateBook,
   type BookEditPayload,
 } from "@/api/books.api";
 import type { Book } from "@/types/book.types";
 import { Badge } from "@/components/ui/badge";
 import {
+  BookPlus,
   ChevronLeft,
   ChevronRight,
   Heart,
@@ -25,6 +27,10 @@ import { useToast } from "@/contexts/ToastContext";
 import { useCart } from "@/contexts/CartContext";
 import { useUser } from "@/contexts/UserContext";
 import { isAdminRole } from "@/constants";
+import {
+  UploadForSaleModal,
+  type UploadListingFormValues,
+} from "@/features/user/components/UploadForSaleModal";
 
 type ViewMode = "grid" | "list";
 type SortOption = "title" | "price-asc" | "price-desc" | "rating";
@@ -49,6 +55,8 @@ const Books: React.FC = () => {
   const [editBook, setEditBook] = useState<Book | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     setWishlist(new Set(getSavedBookIds(user?.id)));
@@ -213,6 +221,35 @@ const Books: React.FC = () => {
     }
   };
 
+  const handleAddBook = async (values: UploadListingFormValues) => {
+    if (!user?.id) return;
+    setIsAdding(true);
+    try {
+      const created = await createListing(user.id, values);
+      // Admin catalog stock: store inventory, not a user marketplace listing
+      const catalogBook: Book = {
+        ...created,
+        sellerId: undefined,
+        location: "Store",
+        availableCopies: Math.max(1, created.availableCopies),
+        totalCopies: Math.max(1, created.totalCopies),
+      };
+      setBooks((prev) => [catalogBook, ...prev]);
+      setAddOpen(false);
+      toast({
+        message: `Added “${catalogBook.title}” to the catalog`,
+        variant: "success",
+      });
+    } catch {
+      toast({
+        message: "Failed to add book. Please try again.",
+        variant: "default",
+      });
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   if (isLoading) {
     return <PageSkeleton />;
   }
@@ -228,6 +265,16 @@ const Books: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-ink-800 px-3.5 text-sm font-medium text-white shadow-sm hover:bg-ink-900 transition-colors"
+            >
+              <BookPlus className="h-4 w-4" />
+              Add book
+            </button>
+          )}
           <label className="relative flex h-9 min-w-[min(100%,240px)] flex-1 sm:flex-none sm:w-64 items-center rounded-lg border border-ink-100 bg-white shadow-sm focus-within:border-ink-300 focus-within:ring-2 focus-within:ring-ink-100">
             <Search className="absolute left-2.5 h-4 w-4 text-ink-400 pointer-events-none" />
             <input
@@ -478,6 +525,19 @@ const Books: React.FC = () => {
           isSaving={isSavingEdit}
           onClose={() => !isSavingEdit && setEditBook(null)}
           onSave={handleSaveEdit}
+        />
+      )}
+
+      {isAdmin && (
+        <UploadForSaleModal
+          open={addOpen}
+          isSubmitting={isAdding}
+          onClose={() => !isAdding && setAddOpen(false)}
+          onSubmit={handleAddBook}
+          heading="Add book"
+          description="Add a thrift book to the store catalog"
+          submitLabel="Add to catalog"
+          submittingLabel="Adding..."
         />
       )}
     </div>
