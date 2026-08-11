@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": "cart_001",
+      "userId": "u1",
+      "bookId": "book_001",
+      "quantity": 1,
+      "addedAt": "2025-02-10T10:00:00Z"
+    },
+    {
+      "id": "cart_002",
+      "userId": "u1",
+      "bookId": "book_004",
+      "quantity": 1,
+      "addedAt": "2025-02-11T14:30:00Z"
+    },
+    {
+      "id": "cart_003",
+      "userId": "u2",
+      "bookId": "book_003",
+      "quantity": 2,
+      "addedAt": "2025-02-12T09:15:00Z"
+    }
+  ]
+}

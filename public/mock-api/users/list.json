@@ -1,0 +1,50 @@
+[
+  {
+    "id": "u1",
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "role": "user",
+    "phone": "+1 555-0101",
+    "joinedAt": "2024-03-12"
+  },
+  {
+    "id": "u2",
+    "name": "John Smith",
+    "email": "john@example.com",
+    "role": "user",
+    "phone": "+1 555-0102",
+    "joinedAt": "2024-05-20"
+  },
+  {
+    "id": "u3",
+    "name": "Alice Rivera",
+    "email": "alice@example.com",
+    "role": "user",
+    "phone": "+1 555-0103",
+    "joinedAt": "2024-08-01"
+  },
+  {
+    "id": "u4",
+    "name": "Bob Chen",
+    "email": "bob@example.com",
+    "role": "user",
+    "phone": "+1 555-0104",
+    "joinedAt": "2024-09-15"
+  },
+  {
+    "id": "admin1",
+    "name": "Admin User",
+    "email": "admin@admin.com",
+    "role": "admin",
+    "phone": "+1 555-9001",
+    "joinedAt": "2023-01-10"
+  },
+  {
+    "id": "sa1",
+    "name": "Super Admin",
+    "email": "superadmin@thrift.com",
+    "role": "superadmin",
+    "phone": "+1 555-9000",
+    "joinedAt": "2022-11-01"
+  }
+]

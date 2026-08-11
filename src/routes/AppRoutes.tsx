@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { isAdminRole } from "@/constants";
 
 // Public pages
 import LoginPage from "@/features/auth/pages/Login";
@@ -15,12 +16,14 @@ import MyBooks from "@/features/user/pages/MyBooks";
 // Admin pages
 import AdminHome from "@/features/admin/pages/AdminDashboard";
 import ManageUsers from "@/features/admin/pages/ManageUsers";
+import UserDetail from "@/features/admin/pages/UserDetail";
 
 // Layouts
 import DashboardLayout from "@/components/layout/Dashboard/DashboardLayout/DashboardLayout";
+import PageSkeleton from "@/components/ui/PageSkeleton";
 
 const DashboardHome = ({ role }: { role?: string }) => {
-  if (role === "admin") return <AdminHome />;
+  if (isAdminRole(role)) return <AdminHome />;
   return <UserHome />;
 };
 
@@ -30,24 +33,22 @@ const AppRoutes = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div>Loading...</div>
+      <div className="min-h-screen bg-ink-50 p-6">
+        <PageSkeleton />
       </div>
     );
   }
 
   return (
     <Routes>
-      {/* Public */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-      {/* Shared dashboard for user + admin */}
       <Route
         path="/dashboard"
         element={
           <ProtectedRoute
-            allowedRoles={["user", "admin"]}
+            allowedRoles={["user", "admin", "superadmin"]}
             userRole={userRole}
             isLoading={isLoading}
           >
@@ -63,7 +64,7 @@ const AppRoutes = () => {
           path="users"
           element={
             <ProtectedRoute
-              allowedRoles={["admin"]}
+              allowedRoles={["admin", "superadmin"]}
               userRole={userRole}
               isLoading={isLoading}
             >
@@ -71,16 +72,26 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="user/:id"
+          element={
+            <ProtectedRoute
+              allowedRoles={["admin", "superadmin"]}
+              userRole={userRole}
+              isLoading={isLoading}
+            >
+              <UserDetail />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
-      {/* Backwards-compatible admin URL */}
       <Route path="/admin/*" element={<Navigate to="/dashboard" replace />} />
 
-      {/* Root redirect */}
       <Route
         path="/"
         element={
-          userRole === "admin" || userRole === "user" ? (
+          userRole === "user" || isAdminRole(userRole) ? (
             <Navigate to="/dashboard" replace />
           ) : (
             <Navigate to="/login" replace />
@@ -88,7 +99,6 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

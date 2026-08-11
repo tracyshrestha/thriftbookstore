@@ -18,6 +18,7 @@ export const ROUTES = {
   MY_BOOKS: "/dashboard/my-books",
   PROFILE: "/dashboard/profile",
   ADMIN_USERS: "/dashboard/users",
+  ADMIN_USER: (id: string) => `/dashboard/user/${id}`,
   ADMIN_BOOKS: "/dashboard/books",
   ADMIN_REPORTS: "/dashboard/reports",
 } as const;

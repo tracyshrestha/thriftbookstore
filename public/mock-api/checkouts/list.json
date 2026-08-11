@@ -1,0 +1,32 @@
+[
+  {
+    "id": "checkout_001",
+    "userId": "u1",
+    "bookId": "book_002",
+    "checkoutDate": "2024-01-15",
+    "dueDate": "2024-02-15",
+    "isOverdue": true,
+    "renewalCount": 1,
+    "maxRenewals": 2
+  },
+  {
+    "id": "checkout_002",
+    "userId": "u1",
+    "bookId": "book_006",
+    "checkoutDate": "2024-01-20",
+    "dueDate": "2024-02-20",
+    "isOverdue": false,
+    "renewalCount": 0,
+    "maxRenewals": 2
+  },
+  {
+    "id": "checkout_003",
+    "userId": "u2",
+    "bookId": "book_003",
+    "checkoutDate": "2024-02-01",
+    "dueDate": "2024-03-01",
+    "isOverdue": false,
+    "renewalCount": 0,
+    "maxRenewals": 2
+  }
+]

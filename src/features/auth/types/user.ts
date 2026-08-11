@@ -7,4 +7,6 @@ export type User = {
   role: UserRole;
   phone?: string;
   joinedAt?: string;
+  /** Available thrift credits (cents) */
+  credits?: number;
 };

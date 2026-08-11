@@ -1,35 +1,35 @@
-
-import { Navigate } from "react-router-dom"
-import type { ReactNode } from "react"
+import { Navigate } from "react-router-dom";
+import type { ReactNode } from "react";
+import PageSkeleton from "@/components/ui/PageSkeleton";
 
 interface ProtectedRouteProps {
-  allowedRoles: string[]
-  userRole?: string
-  isLoading?: boolean
-  children: ReactNode // ✅ This should render the layout components
+  allowedRoles: string[];
+  userRole?: string;
+  isLoading?: boolean;
+  children: ReactNode;
 }
 
 export const ProtectedRoute = ({
   allowedRoles,
   userRole,
   isLoading,
-  children, // Now properly using children instead of just Outlet
+  children,
 }: ProtectedRouteProps) => {
-  // Still loading user → show spinner or nothing
   if (isLoading) {
-    return <div>Loading...</div> // or your fancy loader
+    return (
+      <div className="min-h-screen bg-ink-50 p-6">
+        <PageSkeleton />
+      </div>
+    );
   }
 
-  // No user role (not logged in) → go to login
   if (!userRole) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace />;
   }
 
-  // Role not allowed → go to unauthorized
   if (!allowedRoles.includes(userRole)) {
-    return <Navigate to="/unauthorized" replace />
+    return <Navigate to="/unauthorized" replace />;
   }
 
-  // ✅ Allowed → render children (the layout components)
-  return <>{children}</>
-}
+  return <>{children}</>;
+};
