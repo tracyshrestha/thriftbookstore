@@ -9,14 +9,20 @@ import UnauthorizedPage from "@/features/auth/pages/UnauthorizedPage";
 // User pages
 import UserHome from "@/features/user/pages/UserDashboard";
 import UserProfile from "@/features/user/pages/UserProfile";
+import Books from "@/features/user/pages/Books";
+import MyBooks from "@/features/user/pages/MyBooks";
 
 // Admin pages
 import AdminHome from "@/features/admin/pages/AdminDashboard";
 import ManageUsers from "@/features/admin/pages/ManageUsers";
 
 // Layouts
-import UserDashboardLayout from "@/components/layout/Dashboard/DashboardLayout/DashboardLayout";
-import AdminDashboardLayout from "@/components/layout/Dashboard/AdminDashboardLayout/DashboardLayout";
+import DashboardLayout from "@/components/layout/Dashboard/DashboardLayout/DashboardLayout";
+
+const DashboardHome = ({ role }: { role?: string }) => {
+  if (role === "admin") return <AdminHome />;
+  return <UserHome />;
+};
 
 const AppRoutes = () => {
   const { user, isLoading } = useUser();
@@ -36,40 +42,46 @@ const AppRoutes = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-      {/* User Dashboard */}
+      {/* Shared dashboard for user + admin */}
       <Route
-        path="/user"
+        path="/dashboard"
         element={
-          <ProtectedRoute allowedRoles={["user"]} userRole={userRole} isLoading={isLoading}>
-            <UserDashboardLayout />
+          <ProtectedRoute
+            allowedRoles={["user", "admin"]}
+            userRole={userRole}
+            isLoading={isLoading}
+          >
+            <DashboardLayout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<UserHome />} />
+        <Route index element={<DashboardHome role={userRole} />} />
+        <Route path="books" element={<Books />} />
+        <Route path="my-books" element={<MyBooks />} />
         <Route path="profile" element={<UserProfile />} />
+        <Route
+          path="users"
+          element={
+            <ProtectedRoute
+              allowedRoles={["admin"]}
+              userRole={userRole}
+              isLoading={isLoading}
+            >
+              <ManageUsers />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
-      {/* Admin Dashboard */}
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]} userRole={userRole} isLoading={isLoading}>
-            <AdminDashboardLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<AdminHome />} />
-        <Route path="users" element={<ManageUsers />} />
-      </Route>
+      {/* Backwards-compatible admin URL */}
+      <Route path="/admin/*" element={<Navigate to="/dashboard" replace />} />
 
-      {/* Root redirect based on role */}
+      {/* Root redirect */}
       <Route
         path="/"
         element={
-          userRole === "admin" ? (
-            <Navigate to="/admin" replace />
-          ) : userRole === "user" ? (
-            <Navigate to="/user" replace />
+          userRole === "admin" || userRole === "user" ? (
+            <Navigate to="/dashboard" replace />
           ) : (
             <Navigate to="/login" replace />
           )

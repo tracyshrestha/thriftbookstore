@@ -1,14 +1,8 @@
-// API Endpoints
-export const API_ENDPOINTS = {
-  USERS: "/data/users.json",
-  BOOKS: "/data/books.json",
-  CHECKOUTS: "/data/checkout.json",
-} as const;
-
 // User Roles
 export const USER_ROLES = {
   USER: "user",
   ADMIN: "admin",
+  SUPERADMIN: "superadmin",
 } as const;
 
 // Local Storage Keys
@@ -20,23 +14,17 @@ export const STORAGE_KEYS = {
 export const ROUTES = {
   LOGIN: "/login",
   DASHBOARD: "/dashboard",
-  PERSONAL_INFO: "/personal-info",
-  CHECKED_OUT: "/checked-out",
-  BOOKS: "/books",
-  ADMIN: "/admin",
-  ADMIN_USERS: "/admin/users",
-  ADMIN_BOOKS: "/admin/books",
-  ADMIN_REPORTS: "/admin/reports",
+  BOOKS: "/dashboard/books",
+  MY_BOOKS: "/dashboard/my-books",
+  PROFILE: "/dashboard/profile",
+  ADMIN_USERS: "/dashboard/users",
+  ADMIN_BOOKS: "/dashboard/books",
+  ADMIN_REPORTS: "/dashboard/reports",
 } as const;
 
-// Demo Credentials
-export const DEMO_CREDENTIALS = {
-  REGULAR_USERS: [
-    { email: "jane@example.com", name: "Jane Doe" },
-    { email: "john@example.com", name: "John Smith" },
-  ],
-  ADMIN_USER: {
-    email: "admin@admin.com",
-    name: "Admin User",
-  },
-} as const;
+/** Roles that use admin UI / elevated access */
+export const ADMIN_ROLES = ["admin", "superadmin"] as const;
+
+export function isAdminRole(role?: string | null) {
+  return role === "admin" || role === "superadmin";
+}

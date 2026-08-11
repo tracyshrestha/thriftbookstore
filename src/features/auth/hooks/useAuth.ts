@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { fetchJson } from "@/lib/jsonFetcher";
+import { loginRequest } from "@/api/auth.api";
 import type { AuthState } from "../types/auth.types";
 import type { User } from "../types/user";
-import { API_ENDPOINTS, STORAGE_KEYS } from "@/constants";
+import { STORAGE_KEYS } from "@/constants";
 
 export function useAuth(): AuthState & { isLoading: boolean } {
   const [user, setUser] = useState<User | null>(null);
@@ -11,18 +11,20 @@ export function useAuth(): AuthState & { isLoading: boolean } {
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEYS.AUTH_USER);
     if (raw) {
-      setUser(JSON.parse(raw));
+      try {
+        setUser(JSON.parse(raw) as User);
+      } catch {
+        localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+      }
     }
-    setIsLoading(false); // finished loading
+    setIsLoading(false);
   }, []);
 
-  async function login(email: string, _password: string): Promise<boolean> {
-    const users = await fetchJson<User[]>(API_ENDPOINTS.USERS);
-    const found =
-      users.find((u) => u.email.toLowerCase() === email.toLowerCase()) || null;
-    if (found) {
-      localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(found));
-      setUser(found);
+  async function login(email: string, password: string): Promise<boolean> {
+    const result = await loginRequest({ email, password });
+    if (result.success && result.user) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(result.user));
+      setUser(result.user);
       return true;
     }
     return false;

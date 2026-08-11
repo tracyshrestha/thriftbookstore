@@ -1,37 +1,42 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { fetchJson } from "@/lib/jsonFetcher";
-import { API_ENDPOINTS, STORAGE_KEYS } from "@/constants";
+import { loginRequest } from "@/api/auth.api";
+import { STORAGE_KEYS } from "@/constants";
 import type { User } from "@/features/auth/types/user";
 
 interface UserContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string) => Promise<User | null>;
+  login: (email: string, password: string) => Promise<User | null>;
   logout: () => void;
   updateUser: (data: Partial<User>) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user from localStorage on mount
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEYS.AUTH_USER);
-    if (raw) setUser(JSON.parse(raw));
+    if (raw) {
+      try {
+        setUser(JSON.parse(raw) as User);
+      } catch {
+        localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+      }
+    }
     setIsLoading(false);
   }, []);
 
-  // Login returns the user immediately
-  const login = async (email: string) => {
-    const users = await fetchJson<User[]>(API_ENDPOINTS.USERS);
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
-    if (found) {
-      localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(found));
-      setUser(found);
-      return found; // return user for immediate use
+  const login = async (email: string, password: string) => {
+    const result = await loginRequest({ email, password });
+    if (result.success && result.user) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(result.user));
+      setUser(result.user);
+      return result.user;
     }
     return null;
   };
