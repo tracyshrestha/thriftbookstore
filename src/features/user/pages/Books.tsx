@@ -42,15 +42,17 @@ const Books: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [wishlist, setWishlist] = useState<Set<string>>(
-    () => new Set(getSavedBookIds()),
-  );
+  const [wishlist, setWishlist] = useState<Set<string>>(() => new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [animateIn, setAnimateIn] = useState(false);
   const [editBook, setEditBook] = useState<Book | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setWishlist(new Set(getSavedBookIds(user?.id)));
+  }, [user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,7 +152,7 @@ const Books: React.FC = () => {
 
   const toggleWishlist = (book: Book) => {
     const wasSaved = wishlist.has(book.id);
-    const next = toggleSavedBookId(book.id);
+    const next = toggleSavedBookId(book.id, user?.id);
     setWishlist(new Set(next));
     toast({
       message: wasSaved

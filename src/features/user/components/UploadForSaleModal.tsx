@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Book } from "@/types/book.types";
-import { ImageIcon, Link2, Upload, X } from "lucide-react";
+import { ImageIcon, Link2, Star, Upload, X } from "lucide-react";
 
 export type CoverInputMode = "url" | "file";
 
@@ -26,12 +26,25 @@ export type UploadListingFormValues = {
   coverPreview: string;
 };
 
-const CONDITIONS: NonNullable<Book["condition"]>[] = [
-  "Like New",
-  "Good",
-  "Fair",
+/** Star levels 1–4 map to thrift condition (worst → best) */
+const CONDITION_BY_STARS: NonNullable<Book["condition"]>[] = [
   "Acceptable",
+  "Fair",
+  "Good",
+  "Like New",
 ];
+
+const STARS = [1, 2, 3, 4] as const;
+
+function starsForCondition(condition: NonNullable<Book["condition"]>): number {
+  const i = CONDITION_BY_STARS.indexOf(condition);
+  return i >= 0 ? i + 1 : 3;
+}
+
+function conditionForStars(stars: number): NonNullable<Book["condition"]> {
+  const idx = Math.min(3, Math.max(0, Math.round(stars) - 1));
+  return CONDITION_BY_STARS[idx];
+}
 
 const DEFAULT_COVER =
   "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop";
@@ -325,25 +338,49 @@ export function UploadForSaleModal({
             </Field>
           </div>
 
-          <Field label="Condition" htmlFor="listing-condition">
-            <select
-              id="listing-condition"
-              value={form.condition}
-              onChange={(e) =>
-                setField(
-                  "condition",
-                  e.target.value as UploadListingFormValues["condition"],
-                )
-              }
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Label id="listing-condition-label" className="text-ink-800">
+                Condition
+              </Label>
+              <span className="text-sm font-medium text-ink-800">
+                {form.condition}
+              </span>
+            </div>
+            <div
+              className="flex items-center gap-1"
+              role="radiogroup"
+              aria-labelledby="listing-condition-label"
             >
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </Field>
+              {STARS.map((star) => {
+                const active = starsForCondition(form.condition) >= star;
+                const label = CONDITION_BY_STARS[star - 1];
+                return (
+                  <button
+                    key={star}
+                    type="button"
+                    role="radio"
+                    aria-checked={starsForCondition(form.condition) === star}
+                    aria-label={`${star} star${star === 1 ? "" : "s"} — ${label}`}
+                    onClick={() => setField("condition", conditionForStars(star))}
+                    className={`p-1 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-200 ${
+                      active
+                        ? "text-amber-500 hover:text-amber-600"
+                        : "text-ink-200 hover:text-amber-400"
+                    }`}
+                  >
+                    <Star
+                      className={`h-7 w-7 ${active ? "fill-current" : ""}`}
+                      strokeWidth={1.5}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-ink-400">
+              Click stars to rate condition: Acceptable → Fair → Good → Like New
+            </p>
+          </div>
 
           {/* Cover: URL vs File toggle */}
           <div className="space-y-2">

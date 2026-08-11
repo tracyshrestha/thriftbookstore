@@ -1,9 +1,14 @@
 import React, { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { Wallet, X } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { useToast } from "@/contexts/ToastContext";
 
 const PRESETS_CENTS = [1000, 2500, 5000, 10000, 25000]; // $10–$250
+
+/** Above cart (60–80), page modals (70), toasts (100) */
+const Z_OVERLAY = "z-[200]";
+const Z_CONFIRM = "z-[210]";
 
 function formatCredits(cents: number) {
   return new Intl.NumberFormat("en-US", {
@@ -40,6 +45,15 @@ export function RechargeCreditsModal({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (confirmOpen) setConfirmOpen(false);
@@ -49,7 +63,7 @@ export function RechargeCreditsModal({ open, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, confirmOpen, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const customCents = (() => {
     const n = Number(customDollars);
@@ -90,8 +104,11 @@ export function RechargeCreditsModal({ open, onClose }: Props) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+  return createPortal(
+    <div
+      className={`fixed inset-0 ${Z_OVERLAY} flex items-center justify-center p-4`}
+      style={{ isolation: "isolate" }}
+    >
       <button
         type="button"
         aria-label="Close"
@@ -101,12 +118,11 @@ export function RechargeCreditsModal({ open, onClose }: Props) {
         }}
       />
 
-      {/* Recharge form */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative w-full max-w-md rounded-xl border border-ink-100 bg-white p-5 shadow-2xl"
+        className="relative z-[1] w-full max-w-md rounded-xl border border-ink-100 bg-white p-5 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -223,9 +239,10 @@ export function RechargeCreditsModal({ open, onClose }: Props) {
         </div>
       </div>
 
-      {/* Are you sure */}
       {confirmOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+        <div
+          className={`fixed inset-0 ${Z_CONFIRM} flex items-center justify-center p-4`}
+        >
           <button
             type="button"
             aria-label="Close confirmation"
@@ -236,7 +253,7 @@ export function RechargeCreditsModal({ open, onClose }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={confirmId}
-            className="relative w-full max-w-sm rounded-xl border border-ink-100 bg-white p-5 shadow-2xl"
+            className="relative z-[1] w-full max-w-sm rounded-xl border border-ink-100 bg-white p-5 shadow-2xl"
           >
             <h3
               id={confirmId}
@@ -276,6 +293,7 @@ export function RechargeCreditsModal({ open, onClose }: Props) {
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

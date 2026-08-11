@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getUserById } from "@/api/users.api";
+import { getUserById, getUserSavedBookIds } from "@/api/users.api";
 import { getBooks, getMyBooks } from "@/api/books.api";
 import { getCheckoutsByUser } from "@/api/checkouts.api";
 import type { User } from "@/features/auth/types/user";
@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   BookMarked,
   CalendarDays,
+  Heart,
   IdCard,
   Mail,
   Phone,
@@ -22,7 +23,7 @@ import {
 } from "lucide-react";
 import { getUserCredits } from "@/lib/credits";
 
-type BooksTab = "listed" | "bought";
+type BooksTab = "listed" | "bought" | "saved";
 
 type BoughtBook = Book & { boughtAt: string };
 
@@ -46,6 +47,7 @@ function formatDate(iso?: string) {
 
 function statusLabel(book: Book, tab: BooksTab) {
   if (tab === "bought") return "Bought";
+  if (tab === "saved") return "Saved";
   if (book.status === "sold") return "Sold";
   if (book.status === "draft") return "Draft";
   return "Active";
@@ -53,6 +55,7 @@ function statusLabel(book: Book, tab: BooksTab) {
 
 function statusClass(book: Book, tab: BooksTab) {
   if (tab === "bought") return "bg-ink-100 text-ink-700";
+  if (tab === "saved") return "bg-rose-50 text-rose-700";
   if (book.status === "sold") return "bg-ink-200 text-ink-800";
   if (book.status === "draft") return "bg-ink-50 text-ink-500";
   return "bg-emerald-50 text-emerald-800";
@@ -64,6 +67,7 @@ const UserDetail: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [listedBooks, setListedBooks] = useState<Book[]>([]);
   const [boughtBooks, setBoughtBooks] = useState<BoughtBook[]>([]);
+  const [savedBooks, setSavedBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [booksTab, setBooksTab] = useState<BooksTab>("listed");
@@ -81,12 +85,14 @@ const UserDetail: React.FC = () => {
       setIsLoading(true);
       setError("");
       try {
-        const [found, listings, checkouts, allBooks] = await Promise.all([
-          getUserById(id),
-          getMyBooks(id),
-          getCheckoutsByUser(id),
-          getBooks(),
-        ]);
+        const [found, listings, checkouts, allBooks, savedIds] =
+          await Promise.all([
+            getUserById(id),
+            getMyBooks(id),
+            getCheckoutsByUser(id),
+            getBooks(),
+            getUserSavedBookIds(id),
+          ]);
 
         if (cancelled) return;
 
@@ -94,6 +100,7 @@ const UserDetail: React.FC = () => {
           setUser(null);
           setListedBooks([]);
           setBoughtBooks([]);
+          setSavedBooks([]);
           setError("User not found.");
           return;
         }
@@ -107,9 +114,14 @@ const UserDetail: React.FC = () => {
           })
           .filter((b): b is BoughtBook => b !== null);
 
+        const saved = savedIds
+          .map((bookId) => byId.get(bookId))
+          .filter((b): b is Book => Boolean(b));
+
         setUser(found);
         setListedBooks(listings);
         setBoughtBooks(bought);
+        setSavedBooks(saved);
       } catch {
         if (!cancelled) setError("Failed to load user details.");
       } finally {
@@ -125,8 +137,9 @@ const UserDetail: React.FC = () => {
 
   const tableRows = useMemo(() => {
     if (booksTab === "listed") return listedBooks;
-    return boughtBooks;
-  }, [booksTab, listedBooks, boughtBooks]);
+    if (booksTab === "bought") return boughtBooks;
+    return savedBooks;
+  }, [booksTab, listedBooks, boughtBooks, savedBooks]);
 
   if (isLoading) {
     return <PageSkeleton />;
@@ -250,7 +263,7 @@ const UserDetail: React.FC = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="border border-ink-100 shadow-sm">
           <CardContent className="pt-5 flex items-center gap-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink-50 text-ink-700">
@@ -277,6 +290,19 @@ const UserDetail: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+        <Card className="border border-ink-100 shadow-sm">
+          <CardContent className="pt-5 flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink-50 text-ink-700">
+              <Heart className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-ink-500">Books saved</p>
+              <p className="text-2xl font-semibold text-ink-950 tabular-nums">
+                {savedBooks.length}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* My Books-style table for this member */}
@@ -291,7 +317,7 @@ const UserDetail: React.FC = () => {
                 Same books from this member’s My Books activity
               </p>
             </div>
-            <div className="inline-flex rounded-lg border border-ink-100 bg-white p-0.5 shadow-sm self-start">
+            <div className="inline-flex flex-wrap rounded-lg border border-ink-100 bg-white p-0.5 shadow-sm self-start">
               {(
                 [
                   {
@@ -303,6 +329,11 @@ const UserDetail: React.FC = () => {
                     id: "bought" as const,
                     label: "Bought",
                     count: boughtBooks.length,
+                  },
+                  {
+                    id: "saved" as const,
+                    label: "Saved",
+                    count: savedBooks.length,
                   },
                 ] as const
               ).map((tab) => (
@@ -335,12 +366,16 @@ const UserDetail: React.FC = () => {
               <p className="text-sm font-medium text-ink-900">
                 {booksTab === "listed"
                   ? "No books listed yet"
-                  : "No bought books yet"}
+                  : booksTab === "bought"
+                    ? "No bought books yet"
+                    : "No saved books"}
               </p>
               <p className="text-xs text-ink-500 mt-1">
                 {booksTab === "listed"
                   ? "Listings this member uploads for sale appear here."
-                  : "Purchases from the thrift marketplace appear here."}
+                  : booksTab === "bought"
+                    ? "Purchases from the thrift marketplace appear here."
+                    : "Wishlist books this member saved from Browse appear here."}
               </p>
             </div>
           ) : (
@@ -353,7 +388,11 @@ const UserDetail: React.FC = () => {
                     <th className="pb-3 font-medium">Genre</th>
                     <th className="pb-3 font-medium">Status</th>
                     <th className="pb-3 font-medium">
-                      {booksTab === "bought" ? "Bought" : "Listed"}
+                      {booksTab === "bought"
+                        ? "Bought"
+                        : booksTab === "saved"
+                          ? "Wishlist"
+                          : "Listed"}
                     </th>
                     <th className="pb-3 pr-1 font-medium text-right">Price</th>
                   </tr>
@@ -363,7 +402,9 @@ const UserDetail: React.FC = () => {
                     const date =
                       booksTab === "bought"
                         ? formatDate((book as BoughtBook).boughtAt)
-                        : formatDate(book.listedAt);
+                        : booksTab === "saved"
+                          ? "Saved"
+                          : formatDate(book.listedAt);
                     return (
                       <tr
                         key={`${booksTab}-${book.id}`}

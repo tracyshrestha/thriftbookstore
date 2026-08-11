@@ -3,15 +3,16 @@ import { createListing, getBooks, getMyBooks } from "@/api/books.api";
 import { getCheckoutsByUser } from "@/api/checkouts.api";
 import type { Book } from "@/types/book.types";
 import { useUser } from "@/contexts/UserContext";
-import { Badge } from "@/components/ui/badge";
 import {
   BookMarked,
   BookPlus,
+  Calendar,
   DollarSign,
   Heart,
   LayoutGrid,
   List,
   ShoppingBag,
+  Star,
 } from "lucide-react";
 import {
   UploadForSaleModal,
@@ -82,14 +83,14 @@ const MyBooks: React.FC = () => {
           })
           .filter((b): b is BoughtBook => b !== null);
 
-        let savedIds = getSavedBookIds();
+        let savedIds = getSavedBookIds(user.id);
         // Seed a couple of saves for first visit so Saved is not always empty
         if (savedIds.length === 0 && allBooks.length > 0) {
           savedIds = allBooks
             .filter((b) => b.availableCopies > 0)
             .slice(0, 2)
             .map((b) => b.id);
-          setSavedBookIds(savedIds);
+          setSavedBookIds(savedIds, user.id);
         }
         const saved = savedIds
           .map((id) => byId.get(id))
@@ -164,7 +165,7 @@ const MyBooks: React.FC = () => {
   };
 
   const handleUnsave = (bookId: string) => {
-    const nextIds = toggleSavedBookId(bookId);
+    const nextIds = toggleSavedBookId(bookId, user?.id);
     setSavedBooks((prev) => prev.filter((b) => nextIds.includes(b.id)));
   };
 
@@ -283,7 +284,7 @@ const MyBooks: React.FC = () => {
               )}
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {tabBooks.map((book) => (
                 <BookTile
                   key={book.id}
@@ -299,63 +300,19 @@ const MyBooks: React.FC = () => {
               ))}
             </div>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2.5">
               {tabBooks.map((book) => (
-                <li
-                  key={book.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-ink-100 bg-white p-4 shadow-sm hover:shadow-md hover:border-ink-200 transition-all"
-                >
-                  <img
-                    src={book.coverImage}
-                    alt={`Cover of ${book.title}`}
-                    className="h-28 w-20 shrink-0 rounded-lg object-cover bg-ink-50 border border-ink-100"
-                    loading="lazy"
+                <li key={book.id}>
+                  <BookListRow
+                    book={book}
+                    mode={activeTab}
+                    boughtAt={book.boughtAt}
+                    onUnsave={
+                      activeTab === "saved"
+                        ? () => handleUnsave(book.id)
+                        : undefined
+                    }
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-ink-950 truncate">
-                          {book.title}
-                        </h3>
-                        <p className="text-sm text-ink-500">
-                          by {book.author}
-                        </p>
-                      </div>
-                      <TabBadge
-                        mode={activeTab}
-                        status={book.status}
-                      />
-                    </div>
-                    <p className="text-xs text-ink-400 mt-2">
-                      {book.genre}
-                      {book.condition ? ` · ${book.condition}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
-                    <p className="text-lg font-semibold text-ink-950 tabular-nums">
-                      {formatPrice(book.price)}
-                    </p>
-                    {book.boughtAt && (
-                      <p className="text-xs text-ink-400">
-                        Bought {formatDate(book.boughtAt)}
-                      </p>
-                    )}
-                    {activeTab === "listed" && book.listedAt && (
-                      <p className="text-xs text-ink-400">
-                        Listed {formatDate(book.listedAt)}
-                      </p>
-                    )}
-                    {activeTab === "saved" && (
-                      <button
-                        type="button"
-                        onClick={() => handleUnsave(book.id)}
-                        className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-rose-600 transition-colors"
-                      >
-                        <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
-                        Remove
-                      </button>
-                    )}
-                  </div>
                 </li>
               ))}
             </ul>
@@ -426,19 +383,51 @@ function TabBadge({
 }) {
   if (mode === "bought") {
     return (
-      <Badge variant="secondary" className="shrink-0 bg-ink-50 text-ink-700">
+      <span className="inline-flex items-center rounded-full bg-ink-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
         Owned
-      </Badge>
+      </span>
     );
   }
   if (mode === "saved") {
     return (
-      <Badge variant="secondary" className="shrink-0 bg-rose-50 text-rose-700">
+      <span className="inline-flex items-center gap-0.5 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600 shadow-sm ring-1 ring-rose-100">
+        <Heart className="h-2.5 w-2.5 fill-current" />
         Saved
-      </Badge>
+      </span>
     );
   }
   return <StatusBadge status={status ?? "active"} />;
+}
+
+function ConditionStars({ condition }: { condition?: Book["condition"] }) {
+  if (!condition) return null;
+  const map: Record<NonNullable<Book["condition"]>, number> = {
+    Acceptable: 1,
+    Fair: 2,
+    Good: 3,
+    "Like New": 4,
+  };
+  const n = map[condition] ?? 0;
+  if (!n) return null;
+  return (
+    <div
+      className="inline-flex items-center gap-0.5"
+      title={condition}
+      aria-label={`Condition ${condition}`}
+    >
+      {Array.from({ length: 4 }, (_, i) => (
+        <Star
+          key={i}
+          className={`h-3 w-3 ${
+            i < n
+              ? "fill-amber-400 text-amber-400"
+              : "fill-transparent text-ink-200"
+          }`}
+          strokeWidth={1.5}
+        />
+      ))}
+    </div>
+  );
 }
 
 function BookTile({
@@ -452,59 +441,156 @@ function BookTile({
   boughtAt?: string;
   onUnsave?: () => void;
 }) {
+  const metaDate =
+    mode === "listed" && book.listedAt
+      ? `Listed ${formatDate(book.listedAt)}`
+      : mode === "bought" && boughtAt
+        ? `Bought ${formatDate(boughtAt)}`
+        : null;
+
+  const priceLabel =
+    mode === "bought" ? "Paid" : mode === "saved" ? "Price" : "List price";
+
   return (
-    <article className="rounded-xl border border-ink-100 bg-white p-4 shadow-sm hover:shadow-md hover:border-ink-200 transition-all group flex flex-col">
-      <div className="flex gap-3">
+    <article className="group flex flex-col overflow-hidden rounded-xl border border-ink-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-ink-200 hover:shadow-md">
+      {/* Cover */}
+      <div className="relative aspect-[3/4] overflow-hidden bg-ink-100">
         <img
           src={book.coverImage}
           alt={`Cover of ${book.title}`}
-          className="h-28 w-20 shrink-0 rounded-lg object-cover bg-ink-50 border border-ink-100"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           loading="lazy"
         />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-ink-950 leading-snug line-clamp-2">
-              {book.title}
-            </h3>
-            <TabBadge mode={mode} status={book.status} />
-          </div>
-          <p className="text-sm text-ink-500 mt-1 truncate">
-            by {book.author}
-          </p>
-          <p className="text-xs text-ink-400 mt-2">
-            {book.genre}
-            {book.condition ? ` · ${book.condition}` : ""}
-          </p>
+        <div className="absolute inset-0 bg-gradient-to-t from-ink-950/50 via-transparent to-ink-950/10 pointer-events-none" />
+        <div className="absolute top-2.5 right-2.5 z-[1]">
+          <TabBadge mode={mode} status={book.status} />
         </div>
-      </div>
-
-      <div className="mt-4 pt-3 border-t border-ink-50 flex items-end justify-between gap-2">
-        <div>
-          <p className="text-xs text-ink-500">
-            {mode === "bought" ? "Paid" : mode === "saved" ? "Price" : "List price"}
-          </p>
-          <p className="text-xl font-semibold tracking-tight text-ink-950 tabular-nums">
-            {formatPrice(book.price)}
-          </p>
-        </div>
-        {mode === "listed" && book.listedAt && (
-          <p className="text-xs text-ink-400">
-            Listed {formatDate(book.listedAt)}
-          </p>
-        )}
-        {mode === "bought" && boughtAt && (
-          <p className="text-xs text-ink-400">
-            Bought {formatDate(boughtAt)}
-          </p>
-        )}
         {mode === "saved" && onUnsave && (
           <button
             type="button"
             onClick={onUnsave}
             aria-label="Remove from saved"
-            className="p-2 rounded-lg border border-ink-100 text-rose-500 hover:bg-rose-50 transition-colors"
+            className="absolute top-2.5 left-2.5 z-[1] flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-rose-500 shadow-sm ring-1 ring-ink-100 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-rose-50"
           >
-            <Heart className="h-4 w-4 fill-rose-500" />
+            <Heart className="h-3.5 w-3.5 fill-current" />
+          </button>
+        )}
+        <div className="absolute bottom-2.5 left-2.5 right-2.5 z-[1] flex items-end justify-between gap-2">
+          <p className="text-[11px] font-medium text-white/90 drop-shadow-sm tabular-nums">
+            {priceLabel}
+          </p>
+          <p className="text-sm font-bold text-white tabular-nums drop-shadow-sm">
+            {formatPrice(book.price)}
+          </p>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-1 flex-col p-3 sm:p-3.5">
+        <h3 className="font-semibold text-ink-950 leading-snug line-clamp-2 text-[13px] sm:text-sm min-h-[2.5rem]">
+          {book.title}
+        </h3>
+        <p className="text-xs text-ink-500 mt-1 truncate">by {book.author}</p>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {book.genre && (
+            <span className="inline-flex max-w-full truncate rounded-md bg-ink-50 px-1.5 py-0.5 text-[10px] font-medium text-ink-600 ring-1 ring-ink-100">
+              {book.genre}
+            </span>
+          )}
+          {book.condition && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-ink-50 px-1.5 py-0.5 text-[10px] font-medium text-ink-600 ring-1 ring-ink-100">
+              <ConditionStars condition={book.condition} />
+              <span className="hidden sm:inline truncate">{book.condition}</span>
+            </span>
+          )}
+        </div>
+
+        {metaDate && (
+          <p className="mt-auto pt-3 flex items-center gap-1 text-[11px] text-ink-400">
+            <Calendar className="h-3 w-3 shrink-0" />
+            {metaDate}
+          </p>
+        )}
+        {mode === "saved" && !metaDate && (
+          <p className="mt-auto pt-3 text-[11px] text-ink-400">On your wishlist</p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function BookListRow({
+  book,
+  mode,
+  boughtAt,
+  onUnsave,
+}: {
+  book: Book;
+  mode: BooksTab;
+  boughtAt?: string;
+  onUnsave?: () => void;
+}) {
+  const metaDate =
+    mode === "listed" && book.listedAt
+      ? `Listed ${formatDate(book.listedAt)}`
+      : mode === "bought" && boughtAt
+        ? `Bought ${formatDate(boughtAt)}`
+        : null;
+
+  return (
+    <article className="flex gap-3 sm:gap-4 rounded-xl border border-ink-100 bg-white p-3 sm:p-3.5 shadow-sm transition-all hover:border-ink-200 hover:shadow-md">
+      <div className="relative h-[5.5rem] w-[3.75rem] sm:h-28 sm:w-20 shrink-0 overflow-hidden rounded-lg bg-ink-100 ring-1 ring-ink-100">
+        <img
+          src={book.coverImage}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      </div>
+      <div className="min-w-0 flex-1 flex flex-col justify-center">
+        <div className="flex flex-wrap items-start gap-2 justify-between">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-ink-950 leading-snug line-clamp-2">
+              {book.title}
+            </h3>
+            <p className="text-sm text-ink-500 mt-0.5 truncate">
+              by {book.author}
+            </p>
+          </div>
+          <TabBadge mode={mode} status={book.status} />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {book.genre && (
+            <span className="text-[11px] text-ink-500">{book.genre}</span>
+          )}
+          {book.condition && (
+            <>
+              <span className="text-ink-200">·</span>
+              <ConditionStars condition={book.condition} />
+              <span className="text-[11px] text-ink-500">{book.condition}</span>
+            </>
+          )}
+        </div>
+        {metaDate && (
+          <p className="mt-1.5 text-[11px] text-ink-400 flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {metaDate}
+          </p>
+        )}
+      </div>
+      <div className="shrink-0 flex flex-col items-end justify-center gap-2 pl-1">
+        <p className="text-base sm:text-lg font-semibold text-ink-950 tabular-nums">
+          {formatPrice(book.price)}
+        </p>
+        {mode === "saved" && onUnsave && (
+          <button
+            type="button"
+            onClick={onUnsave}
+            className="inline-flex items-center gap-1 rounded-lg border border-ink-100 px-2 py-1 text-[11px] font-medium text-ink-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+          >
+            <Heart className="h-3 w-3 fill-rose-500 text-rose-500" />
+            Remove
           </button>
         )}
       </div>
@@ -603,18 +689,20 @@ function MetricCard({
 function StatusBadge({ status }: { status: NonNullable<Book["status"]> }) {
   const styles =
     status === "sold"
-      ? "bg-ink-100 text-ink-600"
+      ? "bg-ink-800 text-white"
       : status === "draft"
-        ? "bg-amber-50 text-amber-800"
-        : "bg-ink-50 text-ink-700";
+        ? "bg-amber-500 text-white"
+        : "bg-white/95 text-ink-800 ring-1 ring-ink-100";
 
   const label =
     status === "sold" ? "Sold" : status === "draft" ? "Draft" : "For sale";
 
   return (
-    <Badge variant="secondary" className={`shrink-0 capitalize ${styles}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm ${styles}`}
+    >
       {label}
-    </Badge>
+    </span>
   );
 }
 

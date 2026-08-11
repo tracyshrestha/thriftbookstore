@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookMarked,
   CalendarDays,
   Clock3,
   Download,
   Heart,
+  Loader2,
   RefreshCw,
   ShoppingBag,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import html2canvas from "html2canvas";
 import {
   getDashboardOverview,
   type ActivityBar,
@@ -19,7 +21,8 @@ import {
   type ValueFormat,
 } from "@/api/dashboard.api";
 import { useUser } from "@/contexts/UserContext";
-import PageSkeleton from "@/components/ui/PageSkeleton";
+import { DashboardSkeleton } from "@/components/ui/PageSkeleton";
+import { useToast } from "@/contexts/ToastContext";
 
 const SERIES_COLORS = [
   "#08111c",
@@ -183,9 +186,12 @@ function metricSublabel(card: DashboardMetric): string {
 
 export default function DashboardOverview() {
   const { user } = useUser();
+  const { toast } = useToast();
+  const exportRootRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const [activityPeriod, setActivityPeriod] =
     useState<ActivityPeriod>("monthly");
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("weekly");
@@ -300,8 +306,108 @@ export default function DashboardOverview() {
     });
   };
 
+  const handleExportImage = async () => {
+    const node = exportRootRef.current;
+    if (!node || isExporting) return;
+
+    setIsExporting(true);
+    // Clear ephemeral UI that shouldn't appear in the snapshot
+    setHoverActivity(null);
+    setHoverTime(null);
+    setActiveDonut(null);
+
+    try {
+      // Let paint clear hover tooltips before capture
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+      const canvas = await html2canvas(node, {
+        scale: Math.min(2, window.devicePixelRatio || 2),
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#f8fafc",
+        logging: false,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth: document.documentElement.clientWidth,
+        ignoreElements: (el) =>
+          el instanceof HTMLElement && el.hasAttribute("data-export-ignore"),
+      });
+
+      const dataUrl = canvas.toDataURL("image/png");
+      const stamp = new Date().toISOString().slice(0, 10);
+      const filename = `thrift-dashboard-${stamp}.png`;
+
+      // Download PNG
+      const a = document.createElement("a");
+      a.download = filename;
+      a.href = dataUrl;
+      a.click();
+
+      // Open print dialog with the image
+      const printWin = window.open("", "_blank");
+      if (printWin) {
+        printWin.document.open();
+        printWin.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Thrift Dashboard — ${stamp}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      font-family: system-ui, sans-serif;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+    @media print {
+      body { padding: 0; }
+      img { max-width: 100%; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <img src="${dataUrl}" alt="Dashboard export" />
+  <script>
+    const img = document.querySelector("img");
+    function go() {
+      setTimeout(function () {
+        window.focus();
+        window.print();
+      }, 150);
+    }
+    if (img.complete) go();
+    else img.onload = go;
+  </script>
+</body>
+</html>`);
+        printWin.document.close();
+      }
+
+      toast({
+        message: "Dashboard image exported — ready to print.",
+        variant: "success",
+      });
+    } catch {
+      toast({
+        message: "Could not export the dashboard image. Try again.",
+        variant: "default",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
-    return <PageSkeleton />;
+    return <DashboardSkeleton />;
   }
 
   if (error || !data) {
@@ -324,7 +430,7 @@ export default function DashboardOverview() {
   const distFormat = data.distribution.valueFormat;
 
   return (
-    <div className="w-full space-y-5">
+    <div ref={exportRootRef} className="w-full space-y-5 rounded-xl bg-ink-50">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink-950">Dashboard</h1>
@@ -353,6 +459,7 @@ export default function DashboardOverview() {
 
           <button
             type="button"
+            data-export-ignore
             onClick={load}
             className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-ink-100 bg-white text-sm text-ink-700 shadow-sm hover:bg-ink-50"
           >
@@ -361,13 +468,17 @@ export default function DashboardOverview() {
           </button>
           <button
             type="button"
-            onClick={() =>
-              window.alert("Mock export: dashboard snapshot prepared.")
-            }
-            className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-ink-600 text-sm text-white shadow-sm hover:bg-ink-700"
+            data-export-ignore
+            onClick={handleExportImage}
+            disabled={isExporting}
+            className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-ink-600 text-sm text-white shadow-sm hover:bg-ink-700 disabled:opacity-60"
           >
-            <Download className="h-4 w-4" />
-            Export
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {isExporting ? "Exporting…" : "Export"}
           </button>
         </div>
       </div>
