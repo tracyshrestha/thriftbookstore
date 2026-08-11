@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Book } from "@/types/book.types";
 import {
   CheckCircle2,
@@ -16,9 +17,9 @@ import {
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { useToast } from "@/contexts/ToastContext";
+import { ROUTES } from "@/constants";
 
 const STORAGE_KEY = "thrift_cart";
-const SUCCESS_STORAGE_KEY = "thrift_last_checkout";
 
 export type CartLine = {
   book: Book;
@@ -31,8 +32,6 @@ type CheckoutSuccess = {
   itemCount: number;
   creditsRemaining: number;
   titles: string[];
-  userId?: string;
-  at?: string;
 };
 
 type CartContextValue = {
@@ -72,27 +71,6 @@ function persistCart(items: CartLine[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-function loadSuccess(userId?: string | null): CheckoutSuccess | null {
-  try {
-    const raw = localStorage.getItem(SUCCESS_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CheckoutSuccess;
-    if (!parsed || typeof parsed.totalCents !== "number") return null;
-    if (userId && parsed.userId && parsed.userId !== userId) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function persistSuccess(success: CheckoutSuccess | null) {
-  if (!success) {
-    localStorage.removeItem(SUCCESS_STORAGE_KEY);
-    return;
-  }
-  localStorage.setItem(SUCCESS_STORAGE_KEY, JSON.stringify(success));
-}
-
 function formatPrice(price: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -101,41 +79,30 @@ function formatPrice(price: number) {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const { user, credits, spendCredits } = useUser();
   const { toast } = useToast();
   const [items, setItems] = useState<CartLine[]>(() => loadCart());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [success, setSuccess] = useState<CheckoutSuccess | null>(() =>
-    loadSuccess(),
-  );
+  const [success, setSuccess] = useState<CheckoutSuccess | null>(null);
 
   useEffect(() => {
     persistCart(items);
   }, [items]);
 
-  // Keep last success in sync with the logged-in user (and restore after refresh)
   useEffect(() => {
-    const stored = loadSuccess(user?.id);
-    setSuccess(stored);
-  }, [user?.id]);
-
-  useEffect(() => {
-    persistSuccess(success);
-  }, [success]);
-
-  useEffect(() => {
-    if (!isDrawerOpen) return;
+    if (!isDrawerOpen && !confirmOpen && !success) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (confirmOpen) setConfirmOpen(false);
-        else setIsDrawerOpen(false);
-      }
+      if (e.key !== "Escape") return;
+      if (success) setSuccess(null);
+      else if (confirmOpen) setConfirmOpen(false);
+      else setIsDrawerOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isDrawerOpen, confirmOpen]);
+  }, [isDrawerOpen, confirmOpen, success]);
 
   const addToCart = useCallback((book: Book) => {
     setSuccess(null);
@@ -205,13 +172,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     clearCart();
     setConfirmOpen(false);
+    setIsDrawerOpen(false);
     setSuccess({
       totalCents: paid,
       itemCount: count,
       creditsRemaining: remaining,
       titles,
-      userId: user.id,
-      at: new Date().toISOString(),
     });
     toast({
       message: "Purchase successful — books are on the way!",
@@ -247,7 +213,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
-  const showFab = (itemCount > 0 || success) && !isDrawerOpen;
+  const showFab = itemCount > 0 && !isDrawerOpen;
 
   return (
     <CartContext.Provider value={value}>
@@ -257,23 +223,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={() => setIsDrawerOpen(true)}
-          aria-label={
-            success
-              ? "Open cart — last order success"
-              : `Open cart, ${itemCount} items`
-          }
+          aria-label={`Open cart, ${itemCount} items`}
           className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-ink-800 text-white shadow-lg shadow-ink-900/25 hover:bg-ink-900 hover:scale-105 active:scale-95 transition-all animate-[cart-pop_0.35s_ease-out]"
         >
-          {success ? (
-            <CheckCircle2 className="h-5 w-5 text-emerald-300" />
-          ) : (
-            <ShoppingBag className="h-5 w-5" />
-          )}
-          {itemCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white ring-2 ring-white">
-              {itemCount > 99 ? "99+" : itemCount}
-            </span>
-          )}
+          <ShoppingBag className="h-5 w-5" />
+          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white ring-2 ring-white">
+            {itemCount > 99 ? "99+" : itemCount}
+          </span>
         </button>
       )}
 
@@ -328,63 +284,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {success && (
-              <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="font-semibold text-emerald-900">
-                      Purchase successful
-                    </p>
-                    <p className="text-sm text-emerald-800/80 mt-1">
-                      You bought {success.itemCount} book
-                      {success.itemCount === 1 ? "" : "s"} for{" "}
-                      {formatPrice(success.totalCents)}.
-                    </p>
-                    <p className="text-xs text-emerald-700 mt-2 tabular-nums">
-                      Credits left: {formatPrice(success.creditsRemaining)}
-                    </p>
-                    {success.titles.length > 0 && (
-                      <ul className="mt-2 space-y-0.5">
-                        {success.titles.slice(0, 4).map((t) => (
-                          <li
-                            key={t}
-                            className="text-xs text-emerald-800/70 truncate"
-                          >
-                            · {t}
-                          </li>
-                        ))}
-                        {success.titles.length > 4 && (
-                          <li className="text-xs text-emerald-800/70">
-                            · +{success.titles.length - 4} more
-                          </li>
-                        )}
-                      </ul>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setSuccess(null)}
-                      className="mt-3 text-xs font-medium text-emerald-800 underline underline-offset-2"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {items.length === 0 && !success ? (
+            {items.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center py-16">
                 <ShoppingBag className="h-10 w-10 text-ink-200 mb-3" />
                 <p className="font-medium text-ink-900">Cart is empty</p>
                 <p className="text-sm text-ink-500 mt-1 max-w-[220px]">
                   Add books from Browse and they will show up here.
-                </p>
-              </div>
-            ) : items.length === 0 && success ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-ink-500">
-                  Your cart is empty. Keep browsing to find more thrift finds.
                 </p>
               </div>
             ) : (
@@ -497,8 +402,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               id="checkout-confirm-title"
               className="text-lg font-semibold text-ink-950"
             >
-              Confirm purchase?
+              {items.length === 1
+                ? "Confirm purchase of this book?"
+                : `Confirm purchase of these ${items.length} books?`}
             </h3>
+            {items.length === 1 ? (
+              <p className="mt-2 text-sm font-medium text-ink-900 leading-snug">
+                “{items[0].book.title}”
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-1 max-h-28 overflow-y-auto">
+                {items.map((line) => (
+                  <li
+                    key={line.book.id}
+                    className="text-sm text-ink-800 leading-snug truncate"
+                  >
+                    · “{line.book.title}”
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-sm text-ink-600 mt-3">
+              Pay{" "}
+              <span className="font-semibold text-ink-900 tabular-nums">
+                {formatPrice(totalCents)}
+              </span>{" "}
+              from your{" "}
+              <span className="font-semibold text-ink-900 tabular-nums">
+                {formatPrice(credits)}
+              </span>{" "}
+              credits?
+            </p>
             <p className="text-xs text-ink-400 mt-2 tabular-nums">
               Remaining after: {formatPrice(credits - totalCents)}
             </p>
@@ -516,6 +450,91 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 className="h-10 px-4 rounded-lg bg-ink-800 text-sm font-medium text-white hover:bg-ink-900"
               >
                 Yes, pay with credits
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase success modal */}
+      {success && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close success"
+            className="absolute inset-0 bg-ink-950/50"
+            onClick={() => setSuccess(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="checkout-success-title"
+            className="relative w-full max-w-sm rounded-xl border border-ink-100 bg-white p-5 shadow-2xl"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3
+                  id="checkout-success-title"
+                  className="text-lg font-semibold text-ink-950"
+                >
+                  Purchase successful
+                </h3>
+                <p className="text-sm text-ink-600 mt-1">
+                  You bought {success.itemCount} book
+                  {success.itemCount === 1 ? "" : "s"} for{" "}
+                  <span className="font-semibold text-ink-900 tabular-nums">
+                    {formatPrice(success.totalCents)}
+                  </span>
+                  .
+                </p>
+                <p className="text-xs text-ink-500 mt-2 tabular-nums">
+                  Credits left:{" "}
+                  <span className="font-medium text-ink-800">
+                    {formatPrice(success.creditsRemaining)}
+                  </span>
+                </p>
+                {success.titles.length > 0 && (
+                  <ul className="mt-3 space-y-0.5 max-h-28 overflow-y-auto">
+                    {success.titles.map((t) => (
+                      <li
+                        key={t}
+                        className="text-sm text-ink-800 leading-snug truncate"
+                      >
+                        · “{t}”
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccess(null)}
+                className="p-1.5 rounded-lg text-ink-400 hover:bg-ink-50 hover:text-ink-700"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setSuccess(null)}
+                className="h-10 px-4 rounded-lg border border-ink-100 text-sm font-medium text-ink-700 hover:bg-ink-50"
+              >
+                Done
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccess(null);
+                  navigate(ROUTES.MY_BOOKS);
+                }}
+                className="h-10 px-4 rounded-lg bg-ink-800 text-sm font-medium text-white hover:bg-ink-900"
+              >
+                Go to My Books
               </button>
             </div>
           </div>

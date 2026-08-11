@@ -176,36 +176,40 @@ const Sidebar: React.FC = () => {
             />
           ))}
         </ul>
+
+        {/* Credits — below menu (e.g. under My Books), not a card */}
+        <div className={collapsed ? "mt-3" : "mt-4 pt-3 border-t border-ink-100/80"}>
+          {!collapsed && (
+            <p className="px-2 mb-1.5 text-[11px] font-medium text-ink-400/90 tracking-wide">
+              Credits
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={openRecharge}
+            title="Add credits"
+            aria-label={`Credits ${formatCredits(credits)}. Add credits.`}
+            className={`w-full flex items-center rounded-xl text-[13.5px] transition-colors text-ink-900/75 hover:bg-ink-50 ${
+              collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-2.5 py-2"
+            }`}
+          >
+            <Wallet
+              className="h-[18px] w-[18px] shrink-0 stroke-[1.5] text-ink-800/80"
+            />
+            {!collapsed && (
+              <span className="min-w-0 flex-1 flex items-baseline justify-between gap-2">
+                <span className="truncate">Balance</span>
+                <span className="font-semibold text-ink-950 tabular-nums shrink-0">
+                  {formatCredits(credits)}
+                </span>
+              </span>
+            )}
+          </button>
+        </div>
       </nav>
 
-      {/* Credits — click to recharge */}
-      <div className={`shrink-0 ${collapsed ? "px-2 pb-2" : "px-3 pb-2"}`}>
-        <button
-          type="button"
-          onClick={openRecharge}
-          title="Add credits"
-          aria-label={`Credits ${formatCredits(credits)}. Add credits.`}
-          className={`w-full flex items-center rounded-xl border border-ink-100 bg-white/80 shadow-sm hover:bg-white hover:border-ink-200 transition-colors ${
-            collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2.5"
-          }`}
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-800">
-            <Wallet className="h-4 w-4" />
-          </span>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 text-left">
-              <p className="text-[11px] font-medium text-ink-400">Credits</p>
-              <p className="text-sm font-semibold text-ink-950 tabular-nums truncate">
-                {formatCredits(credits)}
-              </p>
-              <p className="text-[11px] text-ink-500 mt-0.5">Tap to add more</p>
-            </div>
-          )}
-        </button>
-      </div>
-
       {/* Profile footer */}
-      <div ref={menuRef} className="relative shrink-0 p-3 pt-0">
+      <div ref={menuRef} className="relative shrink-0 p-3">
         {menuOpen && (
           <div
             className={`absolute bottom-full mb-2 rounded-xl border border-ink-100 bg-white shadow-lg overflow-hidden ${

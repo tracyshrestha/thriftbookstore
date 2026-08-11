@@ -8,11 +8,11 @@ export default function App() {
   return (
     <UserProvider>
       <ToastProvider>
-        <CartProvider>
-          <BrowserRouter>
+        <BrowserRouter>
+          <CartProvider>
             <AppRoutes />
-          </BrowserRouter>
-        </CartProvider>
+          </CartProvider>
+        </BrowserRouter>
       </ToastProvider>
     </UserProvider>
   );

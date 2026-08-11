@@ -289,7 +289,6 @@ const MyBooks: React.FC = () => {
                   key={book.id}
                   book={book}
                   mode={activeTab}
-                  animateIn={animateIn}
                   boughtAt={book.boughtAt}
                   onUnsave={
                     activeTab === "saved"
@@ -445,13 +444,11 @@ function TabBadge({
 function BookTile({
   book,
   mode,
-  animateIn,
   boughtAt,
   onUnsave,
 }: {
   book: Book;
   mode: BooksTab;
-  animateIn: boolean;
   boughtAt?: string;
   onUnsave?: () => void;
 }) {
@@ -510,23 +507,6 @@ function BookTile({
             <Heart className="h-4 w-4 fill-rose-500" />
           </button>
         )}
-      </div>
-
-      <div className="mt-3 h-1.5 rounded-full bg-ink-50 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${
-            book.status === "sold" ? "bg-ink-300" : "bg-ink-600"
-          }`}
-          style={{
-            width: animateIn
-              ? mode === "saved"
-                ? "55%"
-                : book.status === "sold"
-                  ? "100%"
-                  : "70%"
-              : "0%",
-          }}
-        />
       </div>
     </article>
   );
