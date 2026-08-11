@@ -29,7 +29,31 @@ const SERIES_COLORS = [
   "#3d5a7c",
 ];
 
-const SPARKLINE_COLORS = ["#8b5cf6", "#f97316", "#6366f1", "#0ea5e9"];
+/** Ink-family tones used for metrics (matches app theme) */
+const SPARKLINE_COLORS = ["#152840", "#1e3552", "#2a4566", "#3d5a7c"];
+
+const USER_METRIC_ACCENTS = [
+  {
+    iconBg: "bg-ink-100",
+    iconText: "text-ink-800",
+    chip: "bg-ink-50 text-ink-700",
+  },
+  {
+    iconBg: "bg-ink-50",
+    iconText: "text-ink-700",
+    chip: "bg-ink-50 text-ink-600",
+  },
+  {
+    iconBg: "bg-ink-100",
+    iconText: "text-ink-800",
+    chip: "bg-ink-50 text-ink-700",
+  },
+  {
+    iconBg: "bg-ink-50",
+    iconText: "text-ink-700",
+    chip: "bg-ink-50 text-ink-600",
+  },
+];
 
 /** Simple rising/falling mock points from metric seed */
 function sparkPoints(seed: number, up: boolean, n = 12): number[] {
@@ -137,13 +161,6 @@ function formatValue(n: number, format: ValueFormat) {
   }
   return formatCompact(n);
 }
-
-const METRIC_GRADIENTS = [
-  "linear-gradient(145deg, #ebe4f7 0%, #f8e9d9 42%, #f6b89a 78%, #f29b7c 100%)",
-  "linear-gradient(145deg, #6fd4c4 0%, #d4f0f7 48%, #6aa8ea 100%)",
-  "linear-gradient(145deg, #f3e0f5 0%, #f9e6d4 40%, #f0b89a 100%)",
-  "linear-gradient(145deg, #9ed9d0 0%, #e0f3fa 50%, #7eb3ef 100%)",
-];
 
 function metricIcon(title: string): LucideIcon {
   const t = title.toLowerCase();
@@ -446,35 +463,64 @@ export default function DashboardOverview() {
               ((metricTick + idx) % 3) * (card.up ? scale : -scale * 0.6);
             const display = formatMetricDisplay(card, jitter);
             const Icon = metricIcon(card.title);
-            const gradient =
-              METRIC_GRADIENTS[idx % METRIC_GRADIENTS.length];
+            const tone =
+              USER_METRIC_ACCENTS[idx % USER_METRIC_ACCENTS.length];
+            const sparkColor =
+              SPARKLINE_COLORS[idx % SPARKLINE_COLORS.length];
+            const points = sparkPoints(
+              card.numericValue + idx * 17,
+              card.up,
+            );
 
             return (
               <div
                 key={card.title}
-                className="relative overflow-hidden rounded-[1.35rem] min-h-[148px] px-5 py-4 shadow-[0_8px_24px_rgba(15,30,50,0.08)] transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,30,50,0.12)]"
-                style={{ background: gradient }}
+                className="relative overflow-hidden rounded-xl border border-ink-100 bg-white px-5 py-4 shadow-sm transition-shadow hover:shadow-md"
               >
-                <div className="relative z-[1] flex h-full min-h-[132px] flex-col justify-between">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-[13px] font-medium text-ink-900/80 pt-0.5">
+                <div
+                  className="absolute inset-y-0 left-0 w-1"
+                  style={{ backgroundColor: sparkColor }}
+                  aria-hidden
+                />
+                <div className="relative flex items-start justify-between gap-3 pl-1">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink-800">
                       {card.title}
                     </p>
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/35 backdrop-blur-[2px] ring-1 ring-white/50 shadow-sm">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="text-2xl font-bold tracking-tight text-ink-950 tabular-nums">
+                        {display}
+                      </p>
+                      {card.change && card.change !== "—" && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            card.up
+                              ? "bg-ink-50 text-ink-700"
+                              : "bg-ink-100 text-ink-600"
+                          }`}
+                        >
+                          {card.up ? "↑" : "↓"} {card.change}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-xs text-ink-400">
+                      {metricSublabel(card)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone.iconBg}`}
+                    >
                       <Icon
-                        className="h-4 w-4 text-ink-900"
+                        className={`h-4 w-4 ${tone.iconText}`}
                         strokeWidth={1.75}
                       />
                     </span>
-                  </div>
-
-                  <div className="mt-6">
-                    <p className="text-[2rem] leading-none font-bold tracking-tight text-ink-950 tabular-nums">
-                      {display}
-                    </p>
-                    <p className="mt-1.5 text-[12px] text-ink-800/55">
-                      {metricSublabel(card)}
-                    </p>
+                    <Sparkline
+                      values={points}
+                      color={sparkColor}
+                      id={`user-spark-${idx}-${card.title.replace(/\s+/g, "-")}`}
+                    />
                   </div>
                 </div>
               </div>

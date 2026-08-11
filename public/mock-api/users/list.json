@@ -5,7 +5,8 @@
     "email": "jane@example.com",
     "role": "user",
     "phone": "+1 555-0101",
-    "joinedAt": "2024-03-12"
+    "joinedAt": "2024-03-12",
+    "credits": 25000
   },
   {
     "id": "u2",
@@ -13,7 +14,8 @@
     "email": "john@example.com",
     "role": "user",
     "phone": "+1 555-0102",
-    "joinedAt": "2024-05-20"
+    "joinedAt": "2024-05-20",
+    "credits": 8000
   },
   {
     "id": "u3",
@@ -21,7 +23,8 @@
     "email": "alice@example.com",
     "role": "user",
     "phone": "+1 555-0103",
-    "joinedAt": "2024-08-01"
+    "joinedAt": "2024-08-01",
+    "credits": 12000
   },
   {
     "id": "u4",
@@ -29,7 +32,8 @@
     "email": "bob@example.com",
     "role": "user",
     "phone": "+1 555-0104",
-    "joinedAt": "2024-09-15"
+    "joinedAt": "2024-09-15",
+    "credits": 15000
   },
   {
     "id": "admin1",
@@ -37,7 +41,8 @@
     "email": "admin@admin.com",
     "role": "admin",
     "phone": "+1 555-9001",
-    "joinedAt": "2023-01-10"
+    "joinedAt": "2023-01-10",
+    "credits": 30000
   },
   {
     "id": "sa1",
@@ -45,6 +50,7 @@
     "email": "superadmin@thrift.com",
     "role": "superadmin",
     "phone": "+1 555-9000",
-    "joinedAt": "2022-11-01"
+    "joinedAt": "2022-11-01",
+    "credits": 50000
   }
 ]

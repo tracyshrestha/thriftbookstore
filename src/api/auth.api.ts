@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import { API_PATHS } from "./paths";
 import type { User, UserRole } from "@/features/auth/types/user";
+import { DEFAULT_CREDITS_CENTS } from "@/lib/credits";
 
 export interface CredentialAccount {
   id: string;
@@ -9,6 +10,8 @@ export interface CredentialAccount {
   password: string;
   role: UserRole;
   label: string;
+  /** Starting thrift credits in cents */
+  credits?: number;
 }
 
 export interface CredentialsResponse {
@@ -26,12 +29,22 @@ export interface LoginResult {
   message?: string;
 }
 
+export interface RechargeCreditsPayload {
+  userId: string;
+  amountCents: number;
+  balanceAfter: number;
+}
+
 function toPublicUser(account: CredentialAccount): User {
   return {
     id: account.id,
     name: account.name,
     email: account.email,
     role: account.role,
+    credits:
+      typeof account.credits === "number" && Number.isFinite(account.credits)
+        ? Math.max(0, Math.round(account.credits))
+        : DEFAULT_CREDITS_CENTS,
   };
 }
 
@@ -69,4 +82,24 @@ export async function loginRequest(
   }
 
   return { success: true, user: toPublicUser(account) };
+}
+
+/**
+ * Simulated credit recharge against credentials endpoint.
+ * Network tab shows credentials.json?_method=POST with recharge payload.
+ */
+export async function rechargeCreditsRequest(
+  payload: RechargeCreditsPayload,
+): Promise<{ success: boolean; balance: number }> {
+  await apiRequest<CredentialsResponse>(API_PATHS.AUTH_CREDENTIALS, {
+    method: "POST",
+    body: {
+      _action: "rechargeCredits",
+      userId: payload.userId,
+      amountCents: payload.amountCents,
+      balanceAfter: payload.balanceAfter,
+    },
+  });
+
+  return { success: true, balance: payload.balanceAfter };
 }

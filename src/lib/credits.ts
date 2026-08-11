@@ -42,6 +42,16 @@ export function setUserCredits(userId: string, creditsCents: number): number {
   return next;
 }
 
+export function addUserCredits(
+  userId: string,
+  amountCents: number,
+  fallback: number = DEFAULT_CREDITS_CENTS,
+): number {
+  const current = getUserCredits(userId, fallback);
+  const add = Math.max(0, Math.round(amountCents));
+  return setUserCredits(userId, current + add);
+}
+
 export function deductUserCredits(
   userId: string,
   amountCents: number,
@@ -50,4 +60,10 @@ export function deductUserCredits(
   const current = getUserCredits(userId, fallback);
   if (amountCents > current) return null;
   return setUserCredits(userId, current - amountCents);
+}
+
+/** True if this user already has a stored runtime balance */
+export function hasStoredCredits(userId: string): boolean {
+  const map = readMap();
+  return typeof map[userId] === "number" && Number.isFinite(map[userId]);
 }

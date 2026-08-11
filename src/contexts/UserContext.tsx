@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { loginRequest } from "@/api/auth.api";
+import { loginRequest, rechargeCreditsRequest } from "@/api/auth.api";
 import { STORAGE_KEYS } from "@/constants";
 import type { User } from "@/features/auth/types/user";
 import {
   DEFAULT_CREDITS_CENTS,
+  addUserCredits,
   getUserCredits,
+  hasStoredCredits,
   setUserCredits,
 } from "@/lib/credits";
 
@@ -17,36 +19,22 @@ interface UserContextType {
   updateUser: (data: Partial<User>) => void;
   /** Returns remaining credits, or null if insufficient / not logged in */
   spendCredits: (amountCents: number) => number | null;
+  /** Recharge thrift credits (cents). Returns new balance or null on failure. */
+  rechargeCredits: (amountCents: number) => Promise<number | null>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 function withCredits(user: User): User {
-  const credits = getUserCredits(
-    user.id,
-    user.credits ?? DEFAULT_CREDITS_CENTS,
-  );
+  const seed = user.credits ?? DEFAULT_CREDITS_CENTS;
+  const credits = hasStoredCredits(user.id)
+    ? getUserCredits(user.id, seed)
+    : setUserCredits(user.id, seed);
   return { ...user, credits };
 }
 
-function seedCreditsForUser(userId: string): number {
-  const existingMap = (() => {
-    try {
-      const raw = localStorage.getItem("thrift_user_credits");
-      if (!raw) return null;
-      return JSON.parse(raw) as Record<string, number>;
-    } catch {
-      return null;
-    }
-  })();
-
-  if (existingMap && typeof existingMap[userId] === "number") {
-    return existingMap[userId];
-  }
-
-  const seed =
-    userId === "u1" ? 25000 : userId === "u2" ? 8000 : DEFAULT_CREDITS_CENTS;
-  return setUserCredits(userId, seed);
+function persistUser(next: User) {
+  localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(next));
 }
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -62,10 +50,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         const parsed = JSON.parse(raw) as User;
         const hydrated = withCredits(parsed);
         setUser(hydrated);
-        localStorage.setItem(
-          STORAGE_KEYS.AUTH_USER,
-          JSON.stringify(hydrated),
-        );
+        persistUser(hydrated);
       } catch {
         localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
       }
@@ -76,9 +61,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   const login = async (email: string, password: string) => {
     const result = await loginRequest({ email, password });
     if (result.success && result.user) {
-      const credits = seedCreditsForUser(result.user.id);
-      const hydrated = { ...result.user, credits };
-      localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(hydrated));
+      const hydrated = withCredits(result.user);
+      persistUser(hydrated);
       setUser(hydrated);
       return hydrated;
     }
@@ -97,7 +81,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
       setUserCredits(user.id, data.credits);
       updated.credits = getUserCredits(user.id);
     }
-    localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(updated));
+    persistUser(updated);
     setUser(updated);
   };
 
@@ -110,7 +94,34 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
     if (amountCents > current) return null;
     const next = setUserCredits(user.id, current - amountCents);
     const updated = { ...user, credits: next };
-    localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(updated));
+    persistUser(updated);
+    setUser(updated);
+    return next;
+  };
+
+  const rechargeCredits = async (amountCents: number) => {
+    if (!user) return null;
+    const add = Math.round(amountCents);
+    if (!Number.isFinite(add) || add <= 0) return null;
+
+    const next = addUserCredits(
+      user.id,
+      add,
+      user.credits ?? DEFAULT_CREDITS_CENTS,
+    );
+
+    try {
+      await rechargeCreditsRequest({
+        userId: user.id,
+        amountCents: add,
+        balanceAfter: next,
+      });
+    } catch {
+      // Still apply client-side for offline mock UX; balance already stored
+    }
+
+    const updated = { ...user, credits: next };
+    persistUser(updated);
     setUser(updated);
     return next;
   };
@@ -129,6 +140,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         logout,
         updateUser,
         spendCredits,
+        rechargeCredits,
       }}
     >
       {children}

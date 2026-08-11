@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getUserById } from "@/api/users.api";
-import { getMyBooks } from "@/api/books.api";
+import { getBooks, getMyBooks } from "@/api/books.api";
 import { getCheckoutsByUser } from "@/api/checkouts.api";
 import type { User } from "@/features/auth/types/user";
+import type { Book } from "@/types/book.types";
 import { ROUTES } from "@/constants";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,16 +18,55 @@ import {
   Phone,
   ShoppingBag,
   User as UserIcon,
+  Wallet,
 } from "lucide-react";
+import { getUserCredits } from "@/lib/credits";
+
+type BooksTab = "listed" | "bought";
+
+type BoughtBook = Book & { boughtAt: string };
+
+function formatPrice(price: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(price / 100);
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function statusLabel(book: Book, tab: BooksTab) {
+  if (tab === "bought") return "Bought";
+  if (book.status === "sold") return "Sold";
+  if (book.status === "draft") return "Draft";
+  return "Active";
+}
+
+function statusClass(book: Book, tab: BooksTab) {
+  if (tab === "bought") return "bg-ink-100 text-ink-700";
+  if (book.status === "sold") return "bg-ink-200 text-ink-800";
+  if (book.status === "draft") return "bg-ink-50 text-ink-500";
+  return "bg-emerald-50 text-emerald-800";
+}
 
 const UserDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [listedBooks, setListedBooks] = useState<Book[]>([]);
+  const [boughtBooks, setBoughtBooks] = useState<BoughtBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [listingCount, setListingCount] = useState(0);
-  const [boughtCount, setBoughtCount] = useState(0);
+  const [booksTab, setBooksTab] = useState<BooksTab>("listed");
 
   useEffect(() => {
     if (!id) {
@@ -41,23 +81,35 @@ const UserDetail: React.FC = () => {
       setIsLoading(true);
       setError("");
       try {
-        const [found, listings, checkouts] = await Promise.all([
+        const [found, listings, checkouts, allBooks] = await Promise.all([
           getUserById(id),
           getMyBooks(id),
           getCheckoutsByUser(id),
+          getBooks(),
         ]);
 
         if (cancelled) return;
 
         if (!found) {
           setUser(null);
+          setListedBooks([]);
+          setBoughtBooks([]);
           setError("User not found.");
           return;
         }
 
+        const byId = new Map(allBooks.map((b) => [b.id, b]));
+        const bought: BoughtBook[] = checkouts
+          .map((c) => {
+            const book = byId.get(c.bookId);
+            if (!book) return null;
+            return { ...book, boughtAt: c.checkoutDate };
+          })
+          .filter((b): b is BoughtBook => b !== null);
+
         setUser(found);
-        setListingCount(listings.length);
-        setBoughtCount(checkouts.length);
+        setListedBooks(listings);
+        setBoughtBooks(bought);
       } catch {
         if (!cancelled) setError("Failed to load user details.");
       } finally {
@@ -70,6 +122,11 @@ const UserDetail: React.FC = () => {
       cancelled = true;
     };
   }, [id]);
+
+  const tableRows = useMemo(() => {
+    if (booksTab === "listed") return listedBooks;
+    return boughtBooks;
+  }, [booksTab, listedBooks, boughtBooks]);
 
   if (isLoading) {
     return <PageSkeleton />;
@@ -108,12 +165,17 @@ const UserDetail: React.FC = () => {
       })
     : "—";
 
+  const creditsDisplay = formatPrice(
+    getUserCredits(user.id, user.credits ?? 0),
+  );
+
   const fields = [
     { label: "Name", value: user.name, icon: UserIcon },
     { label: "Email", value: user.email, icon: Mail },
     { label: "Phone", value: user.phone || "—", icon: Phone },
     { label: "User ID", value: user.id, icon: IdCard },
     { label: "Role", value: user.role, icon: UserIcon, capitalize: true },
+    { label: "Credits", value: creditsDisplay, icon: Wallet },
     { label: "Joined", value: joined, icon: CalendarDays },
   ];
 
@@ -197,7 +259,7 @@ const UserDetail: React.FC = () => {
             <div>
               <p className="text-sm text-ink-500">Books listed</p>
               <p className="text-2xl font-semibold text-ink-950 tabular-nums">
-                {listingCount}
+                {listedBooks.length}
               </p>
             </div>
           </CardContent>
@@ -210,12 +272,148 @@ const UserDetail: React.FC = () => {
             <div>
               <p className="text-sm text-ink-500">Books bought</p>
               <p className="text-2xl font-semibold text-ink-950 tabular-nums">
-                {boughtCount}
+                {boughtBooks.length}
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* My Books-style table for this member */}
+      <Card className="border border-ink-100 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold text-ink-950">
+                Books
+              </CardTitle>
+              <p className="text-xs text-ink-500 mt-0.5">
+                Same books from this member’s My Books activity
+              </p>
+            </div>
+            <div className="inline-flex rounded-lg border border-ink-100 bg-white p-0.5 shadow-sm self-start">
+              {(
+                [
+                  {
+                    id: "listed" as const,
+                    label: "Books listed",
+                    count: listedBooks.length,
+                  },
+                  {
+                    id: "bought" as const,
+                    label: "Bought",
+                    count: boughtBooks.length,
+                  },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setBooksTab(tab.id)}
+                  className={`h-8 px-3 rounded-md text-xs font-medium transition-all ${
+                    booksTab === tab.id
+                      ? "bg-ink-600 text-white shadow-sm"
+                      : "text-ink-600 hover:bg-ink-50"
+                  }`}
+                >
+                  {tab.label}
+                  <span
+                    className={`ml-1.5 tabular-nums ${
+                      booksTab === tab.id ? "text-white/80" : "text-ink-400"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {tableRows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-ink-200 bg-ink-50/40 px-4 py-10 text-center">
+              <p className="text-sm font-medium text-ink-900">
+                {booksTab === "listed"
+                  ? "No books listed yet"
+                  : "No bought books yet"}
+              </p>
+              <p className="text-xs text-ink-500 mt-1">
+                {booksTab === "listed"
+                  ? "Listings this member uploads for sale appear here."
+                  : "Purchases from the thrift marketplace appear here."}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="text-left text-ink-400 border-b border-ink-100">
+                    <th className="pb-3 pl-1 font-medium">Book</th>
+                    <th className="pb-3 font-medium">Author</th>
+                    <th className="pb-3 font-medium">Genre</th>
+                    <th className="pb-3 font-medium">Status</th>
+                    <th className="pb-3 font-medium">
+                      {booksTab === "bought" ? "Bought" : "Listed"}
+                    </th>
+                    <th className="pb-3 pr-1 font-medium text-right">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.map((book) => {
+                    const date =
+                      booksTab === "bought"
+                        ? formatDate((book as BoughtBook).boughtAt)
+                        : formatDate(book.listedAt);
+                    return (
+                      <tr
+                        key={`${booksTab}-${book.id}`}
+                        className="border-b border-ink-50 last:border-0 hover:bg-ink-50/40 transition-colors"
+                      >
+                        <td className="py-3 pl-1">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img
+                              src={book.coverImage}
+                              alt=""
+                              className="h-12 w-9 shrink-0 rounded object-cover border border-ink-100 bg-ink-50"
+                            />
+                            <div className="min-w-0">
+                              <p className="font-medium text-ink-950 truncate max-w-[220px]">
+                                {book.title}
+                              </p>
+                              {book.condition && (
+                                <p className="text-[11px] text-ink-400 mt-0.5">
+                                  {book.condition}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 text-ink-600 max-w-[140px] truncate">
+                          {book.author}
+                        </td>
+                        <td className="py-3 text-ink-600">{book.genre || "—"}</td>
+                        <td className="py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(book, booksTab)}`}
+                          >
+                            {statusLabel(book, booksTab)}
+                          </span>
+                        </td>
+                        <td className="py-3 text-ink-600 tabular-nums">
+                          {date}
+                        </td>
+                        <td className="py-3 pr-1 text-right font-medium text-ink-950 tabular-nums">
+                          {formatPrice(book.price)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

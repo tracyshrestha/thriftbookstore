@@ -13,8 +13,10 @@ import {
   PanelLeftClose,
   Settings,
   Users,
+  Wallet,
 } from "lucide-react";
 import brandLogo from "@/assets/book.png";
+import { RechargeCreditsModal } from "./RechargeCreditsModal";
 
 type NavItem = {
   path: string;
@@ -22,12 +24,20 @@ type NavItem = {
   icon: LucideIcon;
 };
 
+function formatCredits(cents: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
+}
+
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useUser();
+  const { user, credits, logout } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [rechargeOpen, setRechargeOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const mainMenu: NavItem[] = isAdminRole(user?.role)
@@ -90,6 +100,11 @@ const Sidebar: React.FC = () => {
   const handleSettings = () => {
     setMenuOpen(false);
     navigate(ROUTES.PROFILE);
+  };
+
+  const openRecharge = () => {
+    setMenuOpen(false);
+    setRechargeOpen(true);
   };
 
   if (!user) return null;
@@ -163,8 +178,34 @@ const Sidebar: React.FC = () => {
         </ul>
       </nav>
 
+      {/* Credits — click to recharge */}
+      <div className={`shrink-0 ${collapsed ? "px-2 pb-2" : "px-3 pb-2"}`}>
+        <button
+          type="button"
+          onClick={openRecharge}
+          title="Add credits"
+          aria-label={`Credits ${formatCredits(credits)}. Add credits.`}
+          className={`w-full flex items-center rounded-xl border border-ink-100 bg-white/80 shadow-sm hover:bg-white hover:border-ink-200 transition-colors ${
+            collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2.5"
+          }`}
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-800">
+            <Wallet className="h-4 w-4" />
+          </span>
+          {!collapsed && (
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-[11px] font-medium text-ink-400">Credits</p>
+              <p className="text-sm font-semibold text-ink-950 tabular-nums truncate">
+                {formatCredits(credits)}
+              </p>
+              <p className="text-[11px] text-ink-500 mt-0.5">Tap to add more</p>
+            </div>
+          )}
+        </button>
+      </div>
+
       {/* Profile footer */}
-      <div ref={menuRef} className="relative shrink-0 p-3">
+      <div ref={menuRef} className="relative shrink-0 p-3 pt-0">
         {menuOpen && (
           <div
             className={`absolute bottom-full mb-2 rounded-xl border border-ink-100 bg-white shadow-lg overflow-hidden ${
@@ -173,8 +214,16 @@ const Sidebar: React.FC = () => {
           >
             <button
               type="button"
-              onClick={handleSettings}
+              onClick={openRecharge}
               className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-ink-900 hover:bg-ink-50 transition-colors"
+            >
+              <Wallet className="w-4 h-4" />
+              {!collapsed && "Add credits"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSettings}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-ink-900 hover:bg-ink-50 transition-colors border-t border-ink-50"
             >
               <Settings className="w-4 h-4" />
               {!collapsed && "Account settings"}
@@ -219,6 +268,11 @@ const Sidebar: React.FC = () => {
           )}
         </button>
       </div>
+
+      <RechargeCreditsModal
+        open={rechargeOpen}
+        onClose={() => setRechargeOpen(false)}
+      />
     </aside>
   );
 };

@@ -9,8 +9,6 @@ import React, {
 import type { Book } from "@/types/book.types";
 import {
   CheckCircle2,
-  Minus,
-  Plus,
   ShoppingBag,
   Trash2,
   Wallet,
@@ -20,10 +18,12 @@ import { useUser } from "@/contexts/UserContext";
 import { useToast } from "@/contexts/ToastContext";
 
 const STORAGE_KEY = "thrift_cart";
+const SUCCESS_STORAGE_KEY = "thrift_last_checkout";
 
 export type CartLine = {
   book: Book;
-  quantity: number;
+  /** Always 1 for thrift listings (unique copies) */
+  quantity: 1;
 };
 
 type CheckoutSuccess = {
@@ -31,6 +31,8 @@ type CheckoutSuccess = {
   itemCount: number;
   creditsRemaining: number;
   titles: string[];
+  userId?: string;
+  at?: string;
 };
 
 type CartContextValue = {
@@ -42,7 +44,6 @@ type CartContextValue = {
   closeDrawer: () => void;
   addToCart: (book: Book) => void;
   removeFromCart: (bookId: string) => void;
-  setQuantity: (bookId: string, quantity: number) => void;
   clearCart: () => void;
 };
 
@@ -52,8 +53,16 @@ function loadCart(): CartLine[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as CartLine[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(raw) as Array<{ book: Book; quantity?: number }>;
+    if (!Array.isArray(parsed)) return [];
+    // Thrift: one unique copy per book — collapse any old multi-qty lines
+    const byId = new Map<string, CartLine>();
+    for (const line of parsed) {
+      if (line?.book?.id && !byId.has(line.book.id)) {
+        byId.set(line.book.id, { book: line.book, quantity: 1 });
+      }
+    }
+    return Array.from(byId.values());
   } catch {
     return [];
   }
@@ -61,6 +70,27 @@ function loadCart(): CartLine[] {
 
 function persistCart(items: CartLine[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function loadSuccess(userId?: string | null): CheckoutSuccess | null {
+  try {
+    const raw = localStorage.getItem(SUCCESS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CheckoutSuccess;
+    if (!parsed || typeof parsed.totalCents !== "number") return null;
+    if (userId && parsed.userId && parsed.userId !== userId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function persistSuccess(success: CheckoutSuccess | null) {
+  if (!success) {
+    localStorage.removeItem(SUCCESS_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(SUCCESS_STORAGE_KEY, JSON.stringify(success));
 }
 
 function formatPrice(price: number) {
@@ -77,11 +107,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [success, setSuccess] = useState<CheckoutSuccess | null>(null);
+  const [success, setSuccess] = useState<CheckoutSuccess | null>(() =>
+    loadSuccess(),
+  );
 
   useEffect(() => {
     persistCart(items);
   }, [items]);
+
+  // Keep last success in sync with the logged-in user (and restore after refresh)
+  useEffect(() => {
+    const stored = loadSuccess(user?.id);
+    setSuccess(stored);
+  }, [user?.id]);
+
+  useEffect(() => {
+    persistSuccess(success);
+  }, [success]);
 
   useEffect(() => {
     if (!isDrawerOpen) return;
@@ -99,13 +141,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setSuccess(null);
     setCheckoutError("");
     setItems((prev) => {
-      const existing = prev.find((line) => line.book.id === book.id);
-      if (existing) {
-        return prev.map((line) =>
-          line.book.id === book.id
-            ? { ...line, quantity: line.quantity + 1 }
-            : line,
-        );
+      // Unique thrift copies — don't bump quantity if already in cart
+      if (prev.some((line) => line.book.id === book.id)) {
+        return prev;
       }
       return [...prev, { book, quantity: 1 }];
     });
@@ -115,28 +153,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => prev.filter((line) => line.book.id !== bookId));
   }, []);
 
-  const setQuantity = useCallback((bookId: string, quantity: number) => {
-    setItems((prev) => {
-      if (quantity <= 0) {
-        return prev.filter((line) => line.book.id !== bookId);
-      }
-      return prev.map((line) =>
-        line.book.id === bookId ? { ...line, quantity } : line,
-      );
-    });
-  }, []);
-
   const clearCart = useCallback(() => {
     setItems([]);
   }, []);
 
-  const itemCount = useMemo(
-    () => items.reduce((sum, line) => sum + line.quantity, 0),
-    [items],
-  );
+  const itemCount = useMemo(() => items.length, [items]);
 
   const totalCents = useMemo(
-    () => items.reduce((sum, line) => sum + line.book.price * line.quantity, 0),
+    () => items.reduce((sum, line) => sum + line.book.price, 0),
     [items],
   );
 
@@ -186,6 +210,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       itemCount: count,
       creditsRemaining: remaining,
       titles,
+      userId: user.id,
+      at: new Date().toISOString(),
     });
     toast({
       message: "Purchase successful — books are on the way!",
@@ -208,7 +234,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       },
       addToCart,
       removeFromCart,
-      setQuantity,
       clearCart,
     }),
     [
@@ -218,7 +243,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       isDrawerOpen,
       addToCart,
       removeFromCart,
-      setQuantity,
       clearCart,
     ],
   );
@@ -386,32 +410,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                         {formatPrice(line.book.price)}
                       </p>
 
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <div className="inline-flex items-center rounded-lg border border-ink-100 bg-ink-50/50">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setQuantity(line.book.id, line.quantity - 1)
-                            }
-                            className="p-1.5 text-ink-600 hover:text-ink-950"
-                            aria-label="Decrease quantity"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <span className="w-7 text-center text-xs font-medium tabular-nums">
-                            {line.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setQuantity(line.book.id, line.quantity + 1)
-                            }
-                            className="p-1.5 text-ink-600 hover:text-ink-950"
-                            aria-label="Increase quantity"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                      <div className="mt-2 flex items-center justify-end">
                         <button
                           type="button"
                           onClick={() => removeFromCart(line.book.id)}
@@ -500,18 +499,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             >
               Confirm purchase?
             </h3>
-            <p className="text-sm text-ink-600 mt-2">
-              Use{" "}
-              <span className="font-semibold text-ink-900 tabular-nums">
-                {formatPrice(totalCents)}
-              </span>{" "}
-              of your{" "}
-              <span className="font-semibold text-ink-900 tabular-nums">
-                {formatPrice(credits)}
-              </span>{" "}
-              credits for {itemCount} book
-              {itemCount === 1 ? "" : "s"}?
-            </p>
             <p className="text-xs text-ink-400 mt-2 tabular-nums">
               Remaining after: {formatPrice(credits - totalCents)}
             </p>
