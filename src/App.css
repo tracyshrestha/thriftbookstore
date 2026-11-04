@@ -1,2 +1,133 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+
+/*
+  Dark-ink blue system — deeper navy, less default “sky/primary blue”.
+  Ink: charcoal-navy | Primary action: deep ocean
+*/
+:root {
+  --radius: 0.625rem;
+  --background: #f1f3f6;
+  --foreground: #0a1420;
+  --card: #ffffff;
+  --card-foreground: #0a1420;
+  --popover: #ffffff;
+  --popover-foreground: #0a1420;
+  --primary: #163355;
+  --primary-foreground: #f5f7fa;
+  --secondary: #e2e7ee;
+  --secondary-foreground: #12253d;
+  --muted: #e8ecf1;
+  --muted-foreground: #5a6b7d;
+  --accent: #d5dde8;
+  --accent-foreground: #0f243c;
+  --destructive: #b91c1c;
+  --border: #cdd5e0;
+  --input: #cdd5e0;
+  --ring: #234f80;
+  --sidebar-gradient: linear-gradient(
+    180deg,
+    #d2dae6 0%,
+    #e8ecf2 42%,
+    #f7f8fa 100%
+  );
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* darker navy scale */
+  --color-ink-50: #f3f5f8;
+  --color-ink-100: #e4e9f0;
+  --color-ink-200: #c8d2e0;
+  --color-ink-300: #95a8c0;
+  --color-ink-400: #5e7898;
+  --color-ink-500: #3d5a7c;
+  --color-ink-600: #2a4566;
+  --color-ink-700: #1e3552;
+  --color-ink-800: #152840;
+  --color-ink-900: #0d1a2c;
+  --color-ink-950: #08111c;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family:
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button {
+    font-family: inherit;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cart-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(12px);
+  }
+  70% {
+    transform: scale(1.08) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
